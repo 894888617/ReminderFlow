@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: reminderflow-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: reminder
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reminderflow-backend
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      SERVER_PORT: 8080
+      DATABASE_DSN: postgres://postgres:postgres@postgres:5432/reminder_flow?sslmode=disable
+      JWT_SECRET: reminder-flow-secret
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: reminderflow-web
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
