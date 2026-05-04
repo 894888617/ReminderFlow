@@ -82,52 +82,53 @@ export default function DashboardPage() {
 
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={12} lg={6}>
-                    <Card loading={loading}>
-                        <Statistic
-                            title="今日截止"
-                            value={dueTodayCount}
-                            suffix="项"
-                            valueStyle={{ cursor: "pointer" }}
-                            onClick={() => navigate("/todos/today")}
-                        />
+                    <Card
+                        loading={loading}
+                        hoverable
+                        onClick={() => navigate("/todos/today")}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <Statistic title="今日截止" value={dueTodayCount} suffix="项" />
                     </Card>
                 </Col>
 
                 <Col xs={24} sm={12} lg={6}>
-                    <Card loading={loading}>
-                        <Statistic
-                            title="今日提醒"
-                            value={remindersTodayCount}
-                            suffix="项"
-                            valueStyle={{ cursor: "pointer" }}
-                            onClick={() => navigate("/todos/today")}
-                        />
+                    <Card
+                        loading={loading}
+                        hoverable
+                        onClick={() => navigate("/todos/today")}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <Statistic title="今日提醒" value={remindersTodayCount} suffix="项" />
                     </Card>
                 </Col>
 
                 <Col xs={24} sm={12} lg={6}>
-                    <Card loading={loading}>
-                        <Statistic
-                            title="未完成任务"
-                            value={unfinishedCount}
-                            suffix="项"
-                            valueStyle={{ cursor: "pointer" }}
-                            onClick={() => navigate("/todos/today")}
-                        />
+                    <Card
+                        loading={loading}
+                        hoverable
+                        onClick={() => navigate("/todos/today")}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <Statistic title="未完成任务" value={unfinishedCount} suffix="项" />
                     </Card>
                 </Col>
 
                 <Col xs={24} sm={12} lg={6}>
-                    <Card loading={loading}>
+                    <Card
+                        loading={loading}
+                        hoverable
+                        onClick={() => navigate("/records/overdue")}
+                        style={{ cursor: "pointer" }}
+                    >
                         <Statistic
                             title="逾期任务"
                             value={overdue.length}
                             suffix="项"
                             valueStyle={{
-                                cursor: "pointer",
                                 color: overdue.length > 0 ? "#cf1322" : undefined,
                             }}
-                            onClick={() => navigate("/records/overdue")}></Statistic>
+                        />
                     </Card>
                 </Col>
             </Row>

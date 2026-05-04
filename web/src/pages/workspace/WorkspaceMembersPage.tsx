@@ -10,7 +10,6 @@ import {
     Select,
     Space,
     Table,
-    Tag,
     Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -38,32 +37,6 @@ const { Title, Text } = Typography;
 interface InviteFormValues {
     keyword: string;
     role: "member" | "viewer";
-}
-
-function roleText(role: WorkspaceRole) {
-    switch (role) {
-        case "owner":
-            return "所有者";
-        case "member":
-            return "成员";
-        case "viewer":
-            return "只读";
-        default:
-            return role;
-    }
-}
-
-function roleColor(role: WorkspaceRole) {
-    switch (role) {
-        case "owner":
-            return "gold";
-        case "member":
-            return "blue";
-        case "viewer":
-            return "default";
-        default:
-            return "default";
-    }
 }
 
 export default function WorkspaceMembersPage() {

@@ -28,7 +28,6 @@ import {
     recordStatusOptions,
     recordWritableStatusOptions,
 } from "../../utils/recordStatus";
-import PageHeader from "../../components/PageHeader.tsx";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;

@@ -449,14 +449,7 @@ export default function RecordDetailPage() {
                     </Form.Item>
 
                     <Form.Item label="重复提醒" name="repeat_type">
-                        <Select
-                            options={[
-                                { label: "不重复", value: "NONE" },
-                                { label: "每天", value: "DAILY" },
-                                { label: "每周", value: "WEEKLY" },
-                                { label: "每月", value: "MONTHLY" },
-                            ]}
-                        />
+                        <Select options={repeatOptions} />
                     </Form.Item>
                 </Form>
             </Modal>
