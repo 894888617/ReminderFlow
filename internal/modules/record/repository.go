@@ -20,17 +20,18 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 type Record struct {
-	ID           int64      `json:"id"`
-	WorkspaceID  int64      `json:"workspace_id"`
-	Title        string     `json:"title"`
-	Content      string     `json:"content"`
-	CreatorID    int64      `json:"creator_id"`
-	AssigneeID   *int64     `json:"assignee_id"`
-	AssigneeName string     `json:"assignee_name"`
-	Status       string     `json:"status"`
-	DueAt        *time.Time `json:"due_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID              int64      `json:"id"`
+	WorkspaceID     int64      `json:"workspace_id"`
+	Title           string     `json:"title"`
+	Content         string     `json:"content"`
+	CreatorID       int64      `json:"creator_id"`
+	AssigneeID      *int64     `json:"assignee_id"`
+	AssigneeName    string     `json:"assignee_name"`
+	Status          string     `json:"status"`
+	DueAt           *time.Time `json:"due_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CurrentUserRole string     `json:"current_user_role"`
 }
 
 type CreateRecordParams struct {
@@ -293,6 +294,51 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 	}
 
 	return &rec, nil
+}
+
+func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, userID int64) (*Record, error) {
+	var item Record
+
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			rec.id,
+			rec.workspace_id,
+			rec.title,
+			COALESCE(rec.content, ''),
+			rec.creator_id,
+			rec.assignee_id,
+			COALESCE(u.username, ''),
+			rec.status,
+			rec.due_at,
+			rec.created_at,
+			rec.updated_at,
+			COALESCE(wm.role, '')
+		FROM records rec
+		LEFT JOIN users u ON u.id = rec.assignee_id
+		LEFT JOIN workspace_members wm
+			ON wm.workspace_id = rec.workspace_id
+			AND wm.user_id = $2
+		WHERE rec.id = $1
+	`, recordID, userID).Scan(
+		&item.ID,
+		&item.WorkspaceID,
+		&item.Title,
+		&item.Content,
+		&item.CreatorID,
+		&item.AssigneeID,
+		&item.AssigneeName,
+		&item.Status,
+		&item.DueAt,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+		&item.CurrentUserRole,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &item, nil
 }
 
 type UpdateRecordParams struct {
@@ -595,4 +641,33 @@ type PageResult struct {
 	PageSize   int      `json:"page_size"`
 	Total      int64    `json:"total"`
 	TotalPages int      `json:"total_pages"`
+}
+
+type BasicRecordInfo struct {
+	ID         int64
+	Title      string
+	AssigneeID int64
+}
+
+func (r *Repository) GetBasicInfo(ctx context.Context, id int64) (*BasicRecordInfo, error) {
+	var item BasicRecordInfo
+
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			id,
+			title,
+			COALESCE(assignee_id, 0)
+		FROM records
+		WHERE id = $1
+	`, id).Scan(
+		&item.ID,
+		&item.Title,
+		&item.AssigneeID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &item, nil
 }

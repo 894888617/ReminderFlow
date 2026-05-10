@@ -1,10 +1,15 @@
 package router
 
 import (
+	"reminder-flow/internal/modules/invite"
+	"reminder-flow/internal/modules/mobile"
 	"reminder-flow/internal/modules/notification"
 	"reminder-flow/internal/modules/record"
 	"reminder-flow/internal/modules/reminder"
+	"reminder-flow/internal/modules/subscription"
 	"reminder-flow/internal/modules/todo"
+	"reminder-flow/internal/modules/wechatmini"
+	"reminder-flow/internal/wechat"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -26,6 +31,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		AllowOrigins: []string{
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
+			//"https://你的管理端域名",
 		},
 		AllowMethods: []string{
 			"GET",
@@ -63,9 +69,6 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	workspaceRepo := workspace.NewRepository(db)
 	workspaceHandler := workspace.NewHandler(workspaceRepo)
 
-	recordRepo := record.NewRepository(db)
-	recordHandler := record.NewHandler(recordRepo)
-
 	reminderRepo := reminder.NewRepository(db)
 	reminderHandler := reminder.NewHandler(reminderRepo)
 
@@ -75,14 +78,48 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	todoRepo := todo.NewRepository(db)
 	todoHandler := todo.NewHandler(todoRepo)
 
+	wechatMiniRepo := wechatmini.NewRepository(db)
+	wechatMiniHandler := wechatmini.NewHandler(cfg, wechatMiniRepo)
+
+	mobileRepo := mobile.NewRepository(db)
+	mobileHandler := mobile.NewHandler(mobileRepo)
+
+	inviteRepo := invite.NewRepository(db)
+	inviteHandler := invite.NewHandler(inviteRepo)
+
+	subscriptionRepo := subscription.NewRepository(db)
+	subscriptionHandler := subscription.NewHandler(subscriptionRepo)
+
+	wechatMiniService := wechat.NewMiniService(
+		cfg.WechatMiniAppID,
+		cfg.WechatMiniAppSecret,
+	)
+
+	subscriptionService := subscription.NewService(
+		cfg,
+		subscriptionRepo,
+		wechatMiniService,
+	)
+
+	recordRepo := record.NewRepository(db)
+	recordHandler := record.NewHandler(recordRepo, subscriptionService)
+
 	api := r.Group("/api")
 	{
 		api.POST("/auth/register", authHandler.Register)
 		api.POST("/auth/login", authHandler.Login)
 
+		api.POST("/wechat/mini/login", wechatMiniHandler.Login)
+
+		api.GET("/invites/:code", inviteHandler.Detail)
+
 		authGroup := api.Group("")
 		authGroup.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
 		{
+			authGroup.POST("/workspaces/:id/invites", inviteHandler.Create)
+			authGroup.POST("/invites/:code/accept", inviteHandler.Accept)
+			authGroup.POST("/wechat/mini/subscriptions", subscriptionHandler.Record)
+
 			authGroup.GET("/users/me", userHandler.Me)
 
 			authGroup.POST("/workspaces", workspaceHandler.Create)
@@ -115,6 +152,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
 
 			authGroup.GET("/todos/today", todoHandler.Today)
+
+			authGroup.GET("/mobile/home", mobileHandler.Home)
 		}
 	}
 

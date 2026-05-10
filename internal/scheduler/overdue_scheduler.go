@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reminder-flow/internal/modules/subscription"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,12 +12,17 @@ import (
 )
 
 type OverdueScheduler struct {
-	db *pgxpool.Pool
+	db                  *pgxpool.Pool
+	subscriptionService *subscription.Service
 }
 
-func NewOverdueScheduler(db *pgxpool.Pool) *OverdueScheduler {
+func NewOverdueScheduler(
+	db *pgxpool.Pool,
+	subscriptionService *subscription.Service,
+) *OverdueScheduler {
 	return &OverdueScheduler{
-		db: db,
+		db:                  db,
+		subscriptionService: subscriptionService,
 	}
 }
 
@@ -47,6 +53,7 @@ type OverdueRecord struct {
 	Title       string
 	CreatorID   int64
 	AssigneeID  *int64
+	DueAt       time.Time
 }
 
 func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
@@ -62,7 +69,8 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 			workspace_id,
 			title,
 			creator_id,
-			assignee_id
+			assignee_id,
+			due_at
 		FROM records
 		WHERE due_at IS NOT NULL
 		  AND due_at < NOW()
@@ -75,6 +83,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	overdueList := make([]OverdueRecord, 0)
 
@@ -87,17 +96,17 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 			&item.Title,
 			&item.CreatorID,
 			&item.AssigneeID,
+			&item.DueAt,
 		); err != nil {
-			rows.Close()
-			return err
+			log.Println("scan overdue record row failed:", err)
+			continue
 		}
 
 		overdueList = append(overdueList, item)
 	}
 
-	rows.Close()
-
 	if err := rows.Err(); err != nil {
+		log.Println("iterate overdue records failed:", err)
 		return err
 	}
 
@@ -108,10 +117,13 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 				status = 'OVERDUE',
 				updated_at = NOW()
 			WHERE id = $1
+			  AND status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
 		`, item.ID)
 
 		if err != nil {
-			return err
+			_ = tx.Rollback(ctx)
+			log.Println("mark record overdue failed:", err)
+			continue
 		}
 
 		notifyUserID := item.CreatorID
@@ -135,7 +147,9 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		`, notifyUserID, item.ID, notificationTitle, notificationContent)
 
 		if err != nil {
-			return err
+			_ = tx.Rollback(ctx)
+			log.Println("create overdue notification failed:", err)
+			continue
 		}
 
 		detail := fmt.Sprintf("系统自动将记录「%s」标记为 OVERDUE", item.Title)
@@ -150,20 +164,34 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 				created_at
 			)
 			VALUES ($1, $2, NULL, $3, $4, NOW())
-		`, item.WorkspaceID, item.ID, "MARK_OVERDUE", detail)
+		`, item.WorkspaceID, item.ID, "SYSTEM_OVERDUE", detail)
 
 		if err != nil {
-			return err
+			_ = tx.Rollback(ctx)
+			log.Println("create overdue operation log failed:", err)
+			continue
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			log.Println("commit overdue tx failed:", err)
+			continue
+		}
+
+		if len(overdueList) > 0 {
+			log.Printf("marked overdue records and sent notifications: %d", len(overdueList))
+		}
+
+		if s.subscriptionService != nil && notifyUserID > 0 {
+			err := s.subscriptionService.SendOverdue(ctx, subscription.SendOverdueParams{
+				UserID:      notifyUserID,
+				RecordID:    item.ID,
+				RecordTitle: item.Title,
+				DueTime:     item.DueAt.Format("2006-01-02 15:04"),
+			})
+			if err != nil {
+				log.Println("send wechat overdue message failed:", err)
+			}
 		}
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-
-	if len(overdueList) > 0 {
-		log.Printf("marked overdue records and sent notifications: %d", len(overdueList))
-	}
-
 	return nil
 }

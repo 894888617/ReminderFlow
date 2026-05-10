@@ -2,6 +2,8 @@ package record
 
 import (
 	"fmt"
+	"log"
+	"reminder-flow/internal/modules/subscription"
 	"reminder-flow/internal/permission"
 	"strconv"
 	"strings"
@@ -14,12 +16,17 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
+	repo                *Repository
+	subscriptionService *subscription.Service
 }
 
-func NewHandler(repo *Repository) *Handler {
+func NewHandler(
+	repo *Repository,
+	subscriptionService *subscription.Service,
+) *Handler {
 	return &Handler{
-		repo: repo,
+		repo:                repo,
+		subscriptionService: subscriptionService,
 	}
 }
 
@@ -242,19 +249,18 @@ func (h *Handler) Detail(c *gin.Context) {
 		return
 	}
 
-	rec, err := h.repo.FindByID(c.Request.Context(), recordID)
+	record, err := h.repo.GetDetailWithRole(c.Request.Context(), recordID, currentUserID)
 	if err != nil {
-		response.NotFound(c, "record not found")
+		response.Internal(c, "get record detail failed")
 		return
 	}
 
-	_, err = h.repo.GetWorkspaceMemberRole(c.Request.Context(), rec.WorkspaceID, currentUserID)
-	if err != nil {
-		response.Forbidden(c, "no permission")
+	if record.CurrentUserRole == "" {
+		response.Forbidden(c, "no permission to view record")
 		return
 	}
 
-	response.OK(c, rec)
+	response.OK(c, record)
 }
 
 func (h *Handler) Update(c *gin.Context) {
@@ -573,32 +579,37 @@ func (h *Handler) TransferAssignee(c *gin.Context) {
 		return
 	}
 
-	newRec, err := h.repo.UpdateAssignee(c.Request.Context(), recordID, req.AssigneeID)
-	if err != nil {
-		response.Internal(c, "transfer assignee failed")
+	if _, err := h.repo.UpdateAssignee(c.Request.Context(), recordID, req.AssigneeID); err != nil {
+		response.Internal(c, "update assignee failed")
 		return
 	}
 
-	userID := currentUserID
-	recordIDValue := newRec.ID
+	recordInfo, err := h.repo.GetBasicInfo(c.Request.Context(), recordID)
+	if err != nil {
+		log.Println("get record basic info failed:", err)
+	} else if h.subscriptionService != nil && req.AssigneeID > 0 {
+		operatorName := "系统"
 
-	_ = h.repo.CreateOperationLog(c.Request.Context(), CreateOperationLogParams{
-		WorkspaceID: newRec.WorkspaceID,
-		RecordID:    &recordIDValue,
-		UserID:      &userID,
-		Action:      "TRANSFER_ASSIGNEE",
-		Detail:      "转交负责人",
-	})
+		if usernameValue, exists := c.Get("username"); exists {
+			if username, ok := usernameValue.(string); ok && username != "" {
+				operatorName = username
+			}
+		}
 
-	_ = h.repo.CreateNotification(
-		c.Request.Context(),
-		req.AssigneeID,
-		newRec.ID,
-		"任务负责人变更",
-		"你被设置为记录「"+newRec.Title+"」的负责人，请及时处理。",
-	)
+		if err := h.subscriptionService.SendAssigneeChanged(
+			c.Request.Context(),
+			subscription.SendAssigneeChangedParams{
+				UserID:       req.AssigneeID,
+				RecordID:     recordID,
+				RecordTitle:  recordInfo.Title,
+				OperatorName: operatorName,
+			},
+		); err != nil {
+			log.Println("send wechat assignee changed message failed:", err)
+		}
+	}
 
-	response.OK(c, newRec)
+	response.OK(c, nil)
 }
 
 func parsePositiveInt(value string, defaultValue int) int {

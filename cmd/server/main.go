@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"reminder-flow/internal/modules/subscription"
 	"reminder-flow/internal/scheduler"
+	"reminder-flow/internal/wechat"
 
 	"reminder-flow/internal/config"
 	"reminder-flow/internal/db"
@@ -18,18 +20,31 @@ func main() {
 	}
 	defer pool.Close()
 
-	migrationPath := db.ResolveMigrationPath()
+	migrationDir := db.ResolveMigrationDir()
 
-	if err := db.RunMigration(pool, migrationPath); err != nil {
-		log.Fatalf("run migration failed: %v", err)
+	if err := db.RunMigrations(pool, migrationDir); err != nil {
+		log.Fatalf("run migrations failed: %v", err)
 	}
 
-	log.Printf("migration executed successfully: %s", migrationPath)
+	log.Printf("migrations executed successfully: %s", migrationDir)
 
-	reminderScheduler := scheduler.NewReminderScheduler(pool)
+	subscriptionRepo := subscription.NewRepository(pool)
+
+	wechatMiniService := wechat.NewMiniService(
+		cfg.WechatMiniAppID,
+		cfg.WechatMiniAppSecret,
+	)
+
+	subscriptionService := subscription.NewService(
+		cfg,
+		subscriptionRepo,
+		wechatMiniService,
+	)
+
+	reminderScheduler := scheduler.NewReminderScheduler(pool, subscriptionService)
 	reminderScheduler.Start()
 
-	overdueScheduler := scheduler.NewOverdueScheduler(pool)
+	overdueScheduler := scheduler.NewOverdueScheduler(pool, subscriptionService)
 	overdueScheduler.Start()
 
 	r := router.NewRouter(pool, cfg)
