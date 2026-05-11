@@ -123,6 +123,17 @@
   margin-bottom: 22px;
 }
 
+.newbie-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.newbie-actions .newbie-primary-btn,
+.newbie-actions .newbie-secondary-btn {
+  margin-bottom: 0;
+}
+
 .newbie-primary-btn {
   background: #1677ff;
   color: #ffffff;
@@ -132,6 +143,10 @@
   font-size: 28px;
   font-weight: 800;
   margin-bottom: 16px;
+}
+
+.newbie-primary-btn.disabled {
+  opacity: 0.55;
 }
 
 .newbie-secondary-btn {
