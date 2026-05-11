@@ -117,13 +117,17 @@ func (r *Repository) FindMyWorkspaces(ctx context.Context, userID int64) ([]Work
 }
 
 type WorkspaceMember struct {
-	ID          int64  `json:"id"`
-	WorkspaceID int64  `json:"workspace_id"`
-	UserID      int64  `json:"user_id"`
-	Username    string `json:"username"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	CreatedAt   string `json:"created_at"`
+	ID            int64  `json:"id"`
+	WorkspaceID   int64  `json:"workspace_id"`
+	UserID        int64  `json:"user_id"`
+	Username      string `json:"username"`
+	Email         string `json:"email"`
+	WechatOpenID  string `json:"wechat_openid"`
+	WechatUnionID string `json:"wechat_unionid"`
+	Nickname      string `json:"nickname"`
+	AvatarURL     string `json:"avatar_url"`
+	Role          string `json:"role"`
+	CreatedAt     string `json:"created_at"`
 }
 
 func (r *Repository) FindUserByUsernameOrEmail(ctx context.Context, keyword string) (int64, error) {
@@ -166,8 +170,12 @@ func (r *Repository) ListMembers(ctx context.Context, workspaceID int64) ([]Work
 			wm.id,
 			wm.workspace_id,
 			wm.user_id,
-			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
+			COALESCE(u.username, ''),
 			COALESCE(u.email, ''),
+			COALESCE(u.wechat_openid, ''),
+			COALESCE(u.wechat_unionid, ''),
+			COALESCE(u.nickname, ''),
+			COALESCE(u.avatar_url, ''),
 			wm.role,
 			wm.created_at::text
 		FROM workspace_members wm
@@ -200,6 +208,10 @@ func (r *Repository) ListMembers(ctx context.Context, workspaceID int64) ([]Work
 			&m.UserID,
 			&m.Username,
 			&m.Email,
+			&m.WechatOpenID,
+			&m.WechatUnionID,
+			&m.Nickname,
+			&m.AvatarURL,
 			&m.Role,
 			&m.CreatedAt,
 		); err != nil {

@@ -15,6 +15,7 @@ import {
 
 import './index.scss'
 import PageRefresh from "../../components/PageRefresh";
+import { getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
 
 const roleOptions: { label: string; value: 'member' | 'viewer' }[] = [
   { label: '成员', value: 'member' },
@@ -149,7 +150,7 @@ export default function WorkspaceMembersPage() {
 
     Taro.showModal({
       title: '确认移除成员',
-      content: `确定要移除 ${member.username} 吗？`,
+      content: `确定要移除 ${getWechatDisplayName(member)} 吗？`,
       success: async (res) => {
         if (!res.confirm) return
 
@@ -205,7 +206,13 @@ export default function WorkspaceMembersPage() {
           {members.map((item) => (
             <View key={item.id} className='member-card'>
               <View className='member-main'>
-                <View className='member-name'>{item.username}</View>
+                <View className='member-name'>{getWechatDisplayName(item)}</View>
+                {item.nickname && item.username && item.nickname !== item.username && (
+                  <View className='member-meta'>账号：{item.username}</View>
+                )}
+                {getMaskedWechatID(item) && (
+                  <View className='member-meta'>微信标识：{getMaskedWechatID(item)}</View>
+                )}
                 <View className='member-meta'>用户 ID：{item.user_id}</View>
                 <View className='member-meta'>
                   加入时间：{formatDateTime(item.created_at)}

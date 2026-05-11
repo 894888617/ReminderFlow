@@ -17,6 +17,10 @@ export interface WorkspaceMember {
   user_id: number
   username: string
   email?: string
+  wechat_openid?: string
+  wechat_unionid?: string
+  nickname?: string
+  avatar_url?: string
   role: WorkspaceRole
   created_at: string
 }

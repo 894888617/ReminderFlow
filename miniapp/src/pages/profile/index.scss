@@ -1,3 +1,22 @@
 .secondary-btn {
   margin-bottom: 20px;
 }
+
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.account-name {
+  color: #111827;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.account-line {
+  color: #6b7280;
+  font-size: 24px;
+  line-height: 1.5;
+}
