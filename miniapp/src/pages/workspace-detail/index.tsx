@@ -64,6 +64,7 @@ export default function WorkspaceDetailPage() {
   const [invitePath, setInvitePath] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [inviteVisible, setInviteVisible] = useState(false)
+  const [invitePanelVisible, setInvitePanelVisible] = useState(false)
 
   const [records, setRecords] = useState<RecordItem[]>([])
   const [keyword, setKeyword] = useState('')
@@ -128,10 +129,36 @@ export default function WorkspaceDetailPage() {
   })
 
 
+  const resetInviteCard = () => {
+    setInvitePanelVisible(false)
+    setInviteVisible(false)
+    setInviteCode('')
+    setInvitePath('')
+  }
+
+  const openInvitePanel = () => {
+    setInvitePanelVisible(true)
+
+    Taro.nextTick(() => {
+      Taro.pageScrollTo({
+        scrollTop: 0,
+        duration: 300,
+      })
+    })
+  }
+
   useShareAppMessage(() => {
+    const sharePath = invitePath || `/pages/workspace/index`
+
+    if (invitePanelVisible && inviteVisible) {
+      setTimeout(() => {
+        resetInviteCard()
+      }, 800)
+    }
+
     return {
       title: `邀请你加入「${workspaceName || '协作空间'}」`,
-      path: invitePath || `/pages/workspace/index`,
+      path: sharePath,
     }
   })
 
@@ -174,6 +201,7 @@ export default function WorkspaceDetailPage() {
       setInviteCode(res.invite_code)
       setInvitePath(res.path)
       setInviteVisible(true)
+      setInvitePanelVisible(true)
 
       Taro.showToast({
         title: '邀请已生成',
@@ -216,8 +244,18 @@ export default function WorkspaceDetailPage() {
           )}
 
           {showInvite && (
-            <View className='invite-btn' onClick={handleCreateInvite}>
-              邀请
+            <View
+              className={invitePanelVisible ? 'invite-btn active' : 'invite-btn'}
+              onClick={() => {
+                if (invitePanelVisible) {
+                  resetInviteCard()
+                  return
+                }
+
+                openInvitePanel()
+              }}
+            >
+              {invitePanelVisible ? '收起' : '邀请'}
             </View>
           )}
 
@@ -236,9 +274,18 @@ export default function WorkspaceDetailPage() {
         </View>
       </View>
 
-      {showInvite && (
+      {showInvite && invitePanelVisible && (
         <View className='invite-panel'>
-          <View className='invite-panel-title'>邀请成员</View>
+          <View className='invite-panel-head'>
+            <View>
+              <View className='invite-panel-title'>邀请成员</View>
+              <View className='invite-panel-subtitle'>设置角色和有效期后生成分享卡片。</View>
+            </View>
+
+            <View className='invite-panel-close' onClick={resetInviteCard}>
+              隐藏
+            </View>
+          </View>
 
           <View className='invite-form-row'>
             <Text className='invite-label'>加入角色</Text>
@@ -377,7 +424,7 @@ export default function WorkspaceDetailPage() {
           {showInvite && (
             <View
               className='empty-record-secondary'
-              onClick={handleCreateInvite}
+              onClick={openInvitePanel}
             >
               邀请成员一起协作
             </View>
