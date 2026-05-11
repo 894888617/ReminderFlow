@@ -134,9 +134,9 @@ func (h *Handler) AddMember(c *gin.Context) {
 		return
 	}
 
-	targetUserID, err := h.repo.FindUserByUsernameOrEmail(c.Request.Context(), req.Keyword)
+	targetUserID, err := h.repo.FindUserByKeyword(c.Request.Context(), req.Keyword)
 	if err != nil {
-		response.NotFound(c, "user not found")
+		response.NotFound(c, "user not found, please check collaboration ID")
 		return
 	}
 

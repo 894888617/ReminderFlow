@@ -32,6 +32,24 @@ export function getWorkspaces() {
   })
 }
 
+export function addWorkspaceMember(
+  workspaceId: number,
+  data: {
+    keyword: string
+    role: 'member' | 'viewer'
+  }
+) {
+  return request<{
+    workspace_id: number
+    user_id: number
+    role: 'member' | 'viewer'
+  }>({
+    url: `/api/workspaces/${workspaceId}/members`,
+    method: 'POST',
+    data,
+  })
+}
+
 export function getWorkspaceMembers(workspaceId: number) {
   return request<WorkspaceMember[]>({
     url: `/api/workspaces/${workspaceId}/members`,
@@ -71,7 +89,6 @@ export function createWorkspace(data: CreateWorkspaceParams) {
     data,
   })
 }
-
 
 export function deleteWorkspace(id: number) {
   return request({

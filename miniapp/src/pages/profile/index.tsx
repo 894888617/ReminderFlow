@@ -2,7 +2,7 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { getMe, type MiniUser } from '../../api/auth'
 import { recordSubscription, SUBSCRIBE_SCENE } from '../../api/subscription'
-import { getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
+import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
 import './index.scss'
 import { useState } from 'react'
 
@@ -110,10 +110,10 @@ export default function ProfilePage() {
         {user?.nickname && user?.username && user.nickname !== user.username && (
           <Text className='account-line'>账号：{user.username}</Text>
         )}
+        <Text className='account-line'>协作 ID：{getCollaborationID(user) || '-'}</Text>
         {getMaskedWechatID(user) && (
           <Text className='account-line'>微信标识：{getMaskedWechatID(user)}</Text>
         )}
-        <Text className='account-line'>用户 ID：{user?.id || '-'}</Text>
       </View>
 
       <View className='secondary-btn' onClick={handleSubscribeMessage}>

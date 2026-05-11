@@ -7,10 +7,22 @@ export interface WechatUserDisplayFields {
   wechat_unionid?: string
 }
 
+export function getUserNumericID(user?: WechatUserDisplayFields | null) {
+  return user?.user_id || user?.id || 0
+}
+
+export function getCollaborationID(user?: WechatUserDisplayFields | null) {
+  const id = getUserNumericID(user)
+
+  if (!id) return ''
+
+  return `U${String(id).padStart(6, '0')}`
+}
+
 export function getWechatDisplayName(user?: WechatUserDisplayFields | null) {
   if (!user) return '-'
 
-  return user.nickname || user.username || getMaskedWechatID(user) || '-'
+  return user.nickname || getCollaborationID(user) || user.username || getMaskedWechatID(user) || '-'
 }
 
 export function getMaskedWechatID(user?: WechatUserDisplayFields | null) {
@@ -21,8 +33,4 @@ export function getMaskedWechatID(user?: WechatUserDisplayFields | null) {
   if (id.length <= 8) return id
 
   return `${id.slice(0, 4)}...${id.slice(-4)}`
-}
-
-export function getUserNumericID(user?: WechatUserDisplayFields | null) {
-  return user?.user_id || user?.id || 0
 }

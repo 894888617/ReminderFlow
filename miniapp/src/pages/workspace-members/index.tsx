@@ -1,8 +1,9 @@
-import { View, Picker } from '@tarojs/components'
+import { Input, Picker, View } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 
 import {
+  addWorkspaceMember,
   getWorkspaceMembers,
   getWorkspaces,
   removeWorkspaceMember,
@@ -15,8 +16,8 @@ import {
 } from '../../utils/permission'
 
 import './index.scss'
-import PageRefresh from "../../components/PageRefresh";
-import { getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
+import PageRefresh from '../../components/PageRefresh'
+import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
 
 const roleOptions: { label: string; value: 'member' | 'viewer' }[] = [
   { label: '成员', value: 'member' },
@@ -57,6 +58,9 @@ export default function WorkspaceMembersPage() {
   const [currentRole, setCurrentRole] = useState(initialRole)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [loading, setLoading] = useState(false)
+  const [memberKeyword, setMemberKeyword] = useState('')
+  const [memberRole, setMemberRole] = useState<'member' | 'viewer'>('member')
+  const [addingMember, setAddingMember] = useState(false)
 
   const manageable = canManageMembers(currentRole)
 
@@ -147,6 +151,47 @@ export default function WorkspaceMembersPage() {
     }
   }
 
+  const handleAddMember = async () => {
+    const keyword = memberKeyword.trim()
+
+    if (!manageable || addingMember) return
+
+    if (!keyword) {
+      Taro.showToast({
+        title: '请输入成员协作 ID',
+        icon: 'none',
+      })
+      return
+    }
+
+    try {
+      setAddingMember(true)
+      Taro.showLoading({
+        title: '添加中',
+        mask: true,
+      })
+
+      await addWorkspaceMember(workspaceId, {
+        keyword,
+        role: memberRole,
+      })
+
+      Taro.hideLoading()
+      Taro.showToast({
+        title: '成员已添加',
+        icon: 'success',
+      })
+
+      setMemberKeyword('')
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      Taro.hideLoading()
+    } finally {
+      setAddingMember(false)
+    }
+  }
+
   const handleRemove = async (member: WorkspaceMember) => {
     if (!manageable) return
 
@@ -215,6 +260,48 @@ export default function WorkspaceMembersPage() {
         </View>
       )}
 
+      {manageable && (
+        <View className='add-member-card'>
+          <View className='add-member-title'>通过协作 ID 添加成员</View>
+          <View className='add-member-desc'>让对方在“我的”页面复制协作 ID（如 U000123），即可准确添加同一个微信登录账号。</View>
+
+          <View className='add-member-row'>
+            <Input
+              className='add-member-input'
+              value={memberKeyword}
+              placeholder='输入协作 ID / 用户 ID / 账号'
+              confirmType='done'
+              onInput={(e) => setMemberKeyword(e.detail.value)}
+              onConfirm={handleAddMember}
+            />
+
+            <Picker
+              mode='selector'
+              range={roleOptions.map((role) => role.label)}
+              value={roleIndex(memberRole)}
+              onChange={(e) => {
+                const index = Number(e.detail.value)
+                const selected = roleOptions[index]
+                if (selected) {
+                  setMemberRole(selected.value)
+                }
+              }}
+            >
+              <View className={`role-tag ${memberRole}`}>
+                {roleText(memberRole)}
+              </View>
+            </Picker>
+          </View>
+
+          <View
+            className={addingMember ? 'add-member-btn disabled' : 'add-member-btn'}
+            onClick={handleAddMember}
+          >
+            {addingMember ? '添加中...' : '直接添加成员'}
+          </View>
+        </View>
+      )}
+
       {loading ? (
         <View className='empty-box'>加载中...</View>
       ) : members.length === 0 ? (
@@ -225,13 +312,13 @@ export default function WorkspaceMembersPage() {
             <View key={item.id} className='member-card'>
               <View className='member-main'>
                 <View className='member-name'>{getWechatDisplayName(item)}</View>
+                <View className='member-meta'>协作 ID：{getCollaborationID(item) || '-'}</View>
                 {item.nickname && item.username && item.nickname !== item.username && (
                   <View className='member-meta'>账号：{item.username}</View>
                 )}
                 {getMaskedWechatID(item) && (
                   <View className='member-meta'>微信标识：{getMaskedWechatID(item)}</View>
                 )}
-                <View className='member-meta'>用户 ID：{item.user_id}</View>
                 <View className='member-meta'>
                   加入时间：{formatDateTime(item.created_at)}
                 </View>
