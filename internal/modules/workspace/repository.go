@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -130,14 +132,28 @@ type WorkspaceMember struct {
 	CreatedAt     string `json:"created_at"`
 }
 
-func (r *Repository) FindUserByUsernameOrEmail(ctx context.Context, keyword string) (int64, error) {
+func (r *Repository) FindUserByKeyword(ctx context.Context, keyword string) (int64, error) {
+	keyword = strings.TrimSpace(keyword)
+	trimmedUserCode := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(keyword), "U"), "#")
+
+	var keywordUserID any
+	if id, err := strconv.ParseInt(trimmedUserCode, 10, 64); err == nil && id > 0 {
+		keywordUserID = id
+	}
+
 	var userID int64
 
 	err := r.db.QueryRow(ctx, `
 		SELECT id
 		FROM users
-		WHERE username = $1 OR email = $1
-	`, keyword).Scan(&userID)
+		WHERE username = $1
+		   OR email = $1
+		   OR wechat_openid = $1
+		   OR wechat_unionid = $1
+		   OR ($2::BIGINT IS NOT NULL AND id = $2::BIGINT)
+		ORDER BY id ASC
+		LIMIT 1
+	`, keyword, keywordUserID).Scan(&userID)
 
 	return userID, err
 }

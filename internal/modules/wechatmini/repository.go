@@ -77,18 +77,22 @@ func (r *Repository) UpsertWechatUser(ctx context.Context, params UpsertWechatUs
 		SELECT id
 		FROM users
 		WHERE wechat_openid = $1
-	`, params.OpenID).Scan(&id)
+		   OR (NULLIF($2, '') IS NOT NULL AND wechat_unionid = $2)
+		ORDER BY CASE WHEN wechat_openid = $1 THEN 0 ELSE 1 END, id ASC
+		LIMIT 1
+	`, params.OpenID, params.UnionID).Scan(&id)
 
 	if err == nil {
 		_, updateErr := r.db.Exec(ctx, `
 			UPDATE users
 			SET
-				wechat_unionid = COALESCE(NULLIF($2, ''), wechat_unionid),
-				nickname = COALESCE(NULLIF($3, ''), nickname),
-				avatar_url = COALESCE(NULLIF($4, ''), avatar_url),
+				wechat_openid = $2,
+				wechat_unionid = COALESCE(NULLIF($3, ''), wechat_unionid),
+				nickname = COALESCE(NULLIF($4, ''), nickname),
+				avatar_url = COALESCE(NULLIF($5, ''), avatar_url),
 				updated_at = NOW()
 			WHERE id = $1
-		`, id, params.UnionID, params.Nickname, params.AvatarURL)
+		`, id, params.OpenID, params.UnionID, params.Nickname, params.AvatarURL)
 
 		if updateErr != nil {
 			return nil, updateErr
