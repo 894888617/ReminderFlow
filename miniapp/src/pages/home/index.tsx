@@ -2,12 +2,14 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { getMobileHome, type MobileHomeSummary } from '../../api/home'
+import { getWorkspaces, type Workspace } from '../../api/workspace'
+import { canCreateRecord } from '../../utils/permission'
 import './index.scss'
 
 export default function HomePage() {
   const [data, setData] = useState<MobileHomeSummary | null>(null)
-
-
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspacesLoaded, setWorkspacesLoaded] = useState(false)
 
   const loadData = async () => {
     const token = Taro.getStorageSync('token')
@@ -19,11 +21,23 @@ export default function HomePage() {
       return
     }
 
+    setWorkspacesLoaded(false)
+
     try {
-      const res = await getMobileHome()
-      setData(res)
+      const homeRes = await getMobileHome()
+      setData(homeRes)
     } catch (err) {
       console.error(err)
+    }
+
+    try {
+      const workspaceRes = await getWorkspaces()
+      setWorkspaces(workspaceRes || [])
+    } catch (err) {
+      console.error(err)
+      setWorkspaces([])
+    } finally {
+      setWorkspacesLoaded(true)
     }
   }
 
@@ -36,13 +50,33 @@ export default function HomePage() {
     Taro.stopPullDownRefresh()
   })
 
-  const isNewbie =
-    data &&
-    data.today_due_count === 0 &&
-    data.today_reminder_count === 0 &&
-    data.unfinished_count === 0 &&
-    data.overdue_count === 0 &&
-    (data.recent_records || []).length === 0
+  const hasWorkspace = workspaces.length > 0
+  const writableWorkspace = workspaces.find((item) => canCreateRecord(item.role))
+  const hasAnyRecord = (data?.recent_records || []).length > 0
+  const hasNoTasks =
+    (data?.today_due_count || 0) === 0 &&
+    (data?.today_reminder_count || 0) === 0 &&
+    (data?.unfinished_count || 0) === 0 &&
+    (data?.overdue_count || 0) === 0 &&
+    !hasAnyRecord
+  const shouldShowWorkspaceActions = Boolean(
+    data && workspacesLoaded && hasNoTasks
+  )
+  const shouldShowQuickCreate = Boolean(data && workspacesLoaded && !hasNoTasks)
+
+  const navigateToCreateRecord = () => {
+    if (!writableWorkspace) {
+      Taro.showToast({
+        title: '暂无可创建记录的空间',
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.navigateTo({
+      url: `/pages/record-create/index?workspace_id=${writableWorkspace.id}`,
+    })
+  }
 
   return (
     <View className='container'>
@@ -89,46 +123,73 @@ export default function HomePage() {
         </View>
       </View>
 
-      {isNewbie && (
+      {shouldShowWorkspaceActions && (
         <View className='newbie-card'>
-          <View className='newbie-title'>开始使用轻记协同</View>
+          <View className='newbie-title'>
+            {hasWorkspace ? '空间已准备好' : '开始使用轻记协同'}
+          </View>
           <View className='newbie-desc'>
-            你还没有开始协作记录。建议先创建一个空间，再创建第一条记录。
+            {hasWorkspace
+              ? '你已经创建或加入空间，可以查看空间详情，也可以马上创建第一条协作记录。'
+              : '你还没有开始协作记录。建议先创建一个空间，再创建第一条记录。'}
           </View>
 
-          <View
-            className='newbie-primary-btn'
-            onClick={() => {
-              Taro.navigateTo({
-                url: '/pages/workspace-create/index',
-              })
-            }}
-          >
-            创建第一个空间
-          </View>
+          {!hasWorkspace && (
+            <View
+              className='newbie-primary-btn'
+              onClick={() => {
+                Taro.navigateTo({
+                  url: '/pages/workspace-create/index',
+                })
+              }}
+            >
+              创建第一个空间
+            </View>
+          )}
 
-          <View
-            className='newbie-secondary-btn'
-            onClick={() => {
-              Taro.switchTab({
-                url: '/pages/workspace/index',
-              })
-            }}
-          >
-            查看我的空间
-          </View>
+          {hasWorkspace && (
+            <View className='newbie-actions'>
+              <View
+                className='newbie-secondary-btn'
+                onClick={() => {
+                  Taro.switchTab({
+                    url: '/pages/workspace/index',
+                  })
+                }}
+              >
+                查看我的空间
+              </View>
+
+              <View
+                className={
+                  writableWorkspace
+                    ? 'newbie-primary-btn'
+                    : 'newbie-primary-btn disabled'
+                }
+                onClick={navigateToCreateRecord}
+              >
+                创建新记录
+              </View>
+            </View>
+          )}
+
+          {!hasWorkspace && (
+            <View
+              className='newbie-secondary-btn'
+              onClick={() => {
+                Taro.switchTab({
+                  url: '/pages/workspace/index',
+                })
+              }}
+            >
+              查看我的空间
+            </View>
+          )}
         </View>
       )}
 
-      {!isNewbie && (
-        <View
-          className='primary-btn'
-          onClick={() => {
-            Taro.navigateTo({
-              url: '/pages/record-create/index',
-            })
-          }}
-        >
+      {shouldShowQuickCreate && (
+        <View className='primary-btn' onClick={navigateToCreateRecord}>
           快速创建记录
         </View>
       )}
