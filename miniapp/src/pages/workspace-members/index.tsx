@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import {
   getWorkspaceMembers,
+  getWorkspaces,
   removeWorkspaceMember,
   updateWorkspaceMemberRole,
   type WorkspaceMember,
@@ -49,13 +50,15 @@ export default function WorkspaceMembersPage() {
   const router = useRouter()
 
   const workspaceId = Number(router.params.workspace_id || router.params.id || 0)
-  const workspaceName = decodeURIComponent(String(router.params.name || ''))
-  const currentRole = String(router.params.role || '')
+  const initialWorkspaceName = decodeURIComponent(String(router.params.name || ''))
+  const initialRole = String(router.params.role || '')
 
-  const manageable = canManageMembers(currentRole)
-
+  const [workspaceName, setWorkspaceName] = useState(initialWorkspaceName)
+  const [currentRole, setCurrentRole] = useState(initialRole)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [loading, setLoading] = useState(false)
+
+  const manageable = canManageMembers(currentRole)
 
   const currentUser = Taro.getStorageSync('user')
   const currentUserId = Number(currentUser?.id || 0)
@@ -80,6 +83,21 @@ export default function WorkspaceMembersPage() {
 
     try {
       setLoading(true)
+
+      const workspaces = await getWorkspaces()
+      const currentWorkspace = (workspaces || []).find((item) => item.id === workspaceId)
+
+      if (!currentWorkspace) {
+        Taro.showToast({
+          title: '未加入该空间或空间不存在',
+          icon: 'none',
+        })
+        return
+      }
+
+      setWorkspaceName(currentWorkspace.name)
+      setCurrentRole(currentWorkspace.role)
+
       const data = await getWorkspaceMembers(workspaceId)
       setMembers(data || [])
     } catch (err) {
