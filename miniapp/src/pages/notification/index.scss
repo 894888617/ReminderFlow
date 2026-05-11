@@ -1,0 +1,162 @@
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.refresh-btn {
+  flex-shrink: 0;
+  font-size: 24px;
+  color: #1677ff;
+  background: #eef5ff;
+  border-radius: 999px;
+  padding: 12px 20px;
+  margin-left: 16px;
+}
+
+.summary-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 26px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.summary-value {
+  display: block;
+  font-size: 42px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.summary-value.unread {
+  color: #ef4444;
+}
+
+.summary-label {
+  display: block;
+  font-size: 24px;
+  color: #6b7280;
+}
+
+.notification-list {
+  padding-bottom: 32px;
+}
+
+.notification-card,
+.empty-box {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.notification-card.unread-card {
+  border-left: 8px solid #1677ff;
+}
+
+.notification-card.read {
+  opacity: 0.82;
+}
+
+.notification-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.title-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.unread-dot {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  background: #1677ff;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.notification-title {
+  font-size: 30px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.type-tag {
+  flex-shrink: 0;
+  font-size: 22px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  margin-left: 16px;
+}
+
+.type-tag.default {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.type-tag.primary {
+  background: #eff6ff;
+  color: #1677ff;
+}
+
+.type-tag.info {
+  background: #ecfeff;
+  color: #0891b2;
+}
+
+.type-tag.danger {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.notification-content {
+  font-size: 26px;
+  color: #4b5563;
+  line-height: 1.6;
+  margin-bottom: 14px;
+  word-break: break-all;
+}
+
+.notification-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notification-time {
+  font-size: 22px;
+  color: #9ca3af;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.read-action,
+.open-action {
+  font-size: 24px;
+  color: #1677ff;
+}
+
+.empty-box {
+  color: #9ca3af;
+  font-size: 26px;
+  text-align: center;
+}

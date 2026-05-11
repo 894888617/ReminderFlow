@@ -1,0 +1,22 @@
+.empty-box {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 40px 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  text-align: center;
+}
+
+.empty-title {
+  display: block;
+  color: #9ca3af;
+  font-size: 28px;
+}
+
+.empty-tip {
+  display: block;
+  margin-top: 12px;
+  color: #c0c4cc;
+  font-size: 24px;
+  line-height: 1.5;
+}

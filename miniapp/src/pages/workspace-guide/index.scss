@@ -1,0 +1,165 @@
+.guide-hero {
+  background: linear-gradient(135deg, #1677ff 0%, #4f46e5 100%);
+  border-radius: 28px;
+  padding: 40px 32px;
+  margin-bottom: 28px;
+  color: #ffffff;
+  box-shadow: 0 16px 36px rgba(22, 119, 255, 0.22);
+}
+
+.guide-title {
+  display: block;
+  font-size: 30px;
+  opacity: 0.9;
+  margin-bottom: 16px;
+}
+
+.guide-name {
+  display: block;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 1.35;
+  margin-bottom: 18px;
+}
+
+.guide-desc {
+  display: block;
+  font-size: 26px;
+  line-height: 1.6;
+  opacity: 0.92;
+}
+
+.guide-card {
+  display: flex;
+  align-items: flex-start;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 26px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.primary-card {
+  border-left: 8px solid #1677ff;
+}
+
+.step-index {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #1677ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 900;
+  margin-right: 20px;
+}
+
+.step-index.green {
+  background: #ecfdf5;
+  color: #07c160;
+}
+
+.step-index.orange {
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.step-desc {
+  display: block;
+  font-size: 24px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.step-btn {
+  flex-shrink: 0;
+  margin-left: 18px;
+  border-radius: 999px;
+  padding: 14px 22px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #1677ff;
+}
+
+.step-btn.primary {
+  background: #1677ff;
+}
+
+.step-btn.green {
+  background: #07c160;
+}
+
+.step-btn.orange {
+  background: #f97316;
+}
+
+.step-btn.disabled {
+  opacity: 0.65;
+}
+
+.share-btn {
+  flex-shrink: 0;
+  margin-left: 18px;
+  background: #07c160;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0 22px;
+  height: 58px;
+  line-height: 58px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.share-btn::after {
+  border: none;
+}
+
+.invite-code-box {
+  background: #f9fafb;
+  color: #4b5563;
+  border-radius: 18px;
+  padding: 20px;
+  font-size: 24px;
+  word-break: break-all;
+  margin: -6px 0 20px;
+}
+
+.bottom-actions {
+  margin-top: 34px;
+  margin-bottom: 48px;
+}
+
+.secondary-action {
+  background: #111827;
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 26px 24px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+
+.link-action {
+  color: #1677ff;
+  text-align: center;
+  font-size: 26px;
+}

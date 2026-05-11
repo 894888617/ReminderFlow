@@ -1,0 +1,109 @@
+.members-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.refresh-btn {
+  flex-shrink: 0;
+  font-size: 24px;
+  color: #1677ff;
+  background: #eef5ff;
+  border-radius: 999px;
+  padding: 12px 20px;
+  margin-left: 16px;
+}
+
+.readonly-tip {
+  background: #fffbeb;
+  color: #b45309;
+  border-radius: 18px;
+  padding: 20px 22px;
+  font-size: 24px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.member-list {
+  padding-bottom: 32px;
+}
+
+.member-card,
+.empty-box {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.member-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.member-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 30px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.member-meta {
+  font-size: 24px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.member-actions {
+  flex-shrink: 0;
+  margin-left: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.role-tag {
+  font-size: 22px;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.role-tag.owner {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.role-tag.member {
+  background: #eff6ff;
+  color: #1677ff;
+}
+
+.role-tag.viewer {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.remove-btn {
+  color: #ef4444;
+  font-size: 24px;
+  background: #fef2f2;
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.empty-box {
+  color: #9ca3af;
+  font-size: 26px;
+  text-align: center;
+}
