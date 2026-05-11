@@ -23,3 +23,11 @@ export function markNotificationRead(id: number) {
     method: 'PUT',
   })
 }
+
+
+export function deleteNotification(id: number) {
+  return request({
+    url: `/api/notifications/${id}`,
+    method: 'DELETE',
+  })
+}

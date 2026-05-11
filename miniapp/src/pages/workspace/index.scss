@@ -142,3 +142,28 @@
   color: #9ca3af;
   line-height: 1.5;
 }
+
+.workspace-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  margin-left: 16px;
+}
+
+.workspace-side .role-tag {
+  margin-left: 0;
+}
+
+.delete-space-btn {
+  font-size: 22px;
+  color: #ef4444;
+  background: #fef2f2;
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.delete-space-btn.disabled {
+  color: #fca5a5;
+}

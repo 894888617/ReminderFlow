@@ -44,7 +44,8 @@
 
 .picker-value,
 .datetime-picker,
-.empty-workspace {
+.empty-workspace,
+.empty-member {
   background: #f9fafb;
   border-radius: 16px;
   padding: 22px 20px;
@@ -52,7 +53,8 @@
   color: #111827;
 }
 
-.empty-workspace {
+.empty-workspace,
+.empty-member {
   color: #9ca3af;
 }
 

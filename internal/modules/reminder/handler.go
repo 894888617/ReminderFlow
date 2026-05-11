@@ -118,6 +118,38 @@ func (h *Handler) Create(c *gin.Context) {
 	response.OK(c, item)
 }
 
+func (h *Handler) ListByRecord(c *gin.Context) {
+	currentUserID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		response.Unauthorized(c, "unauthorized")
+		return
+	}
+
+	recordID, ok := parseRecordID(c)
+	if !ok {
+		return
+	}
+
+	workspaceID, err := h.repo.GetRecordWorkspaceID(c.Request.Context(), recordID)
+	if err != nil {
+		response.Forbidden(c, "record not found")
+		return
+	}
+
+	if _, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), workspaceID, currentUserID); err != nil {
+		response.Forbidden(c, "no permission")
+		return
+	}
+
+	list, err := h.repo.ListByRecord(c.Request.Context(), recordID)
+	if err != nil {
+		response.Internal(c, "query record reminders failed")
+		return
+	}
+
+	response.OK(c, list)
+}
+
 func (h *Handler) ListToday(c *gin.Context) {
 	currentUserID, ok := middleware.GetCurrentUserID(c)
 	if !ok {

@@ -1,8 +1,13 @@
 import { View, Text, Input, Textarea, Picker } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { getWorkspaces, type Workspace } from '../../api/workspace'
+import {
+  getWorkspaceMembers,
+  getWorkspaces,
+  type Workspace,
+  type WorkspaceMember,
+} from '../../api/workspace'
 import { createRecord } from '../../api/record'
 import { canCreateRecord } from '../../utils/permission'
 import { createReminder, type RepeatType } from '../../api/reminder'
@@ -43,6 +48,8 @@ export default function RecordCreatePage() {
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [workspaceId, setWorkspaceId] = useState<number>(routeWorkspaceId || 0)
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [assigneeId, setAssigneeId] = useState<number | undefined>()
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -68,6 +75,24 @@ export default function RecordCreatePage() {
   const selectedWorkspace = useMemo(() => {
     return workspaces.find((item) => item.id === workspaceId)
   }, [workspaces, workspaceId])
+
+  const memberOptions = useMemo(() => {
+    return members.map((item) => ({
+      label: item.username || `用户 ${item.user_id}`,
+      value: item.user_id,
+    }))
+  }, [members])
+
+  const selectedAssigneeIndex = useMemo(() => {
+    if (!assigneeId) return -1
+    return memberOptions.findIndex((item) => item.value === assigneeId)
+  }, [memberOptions, assigneeId])
+
+  const selectedAssigneeName = useMemo(() => {
+    if (!assigneeId) return '未分配'
+    const selected = memberOptions.find((item) => item.value === assigneeId)
+    return selected?.label || '未分配'
+  }, [memberOptions, assigneeId])
 
   const loadWorkspaces = async () => {
     const token = Taro.getStorageSync('token')
@@ -109,6 +134,41 @@ export default function RecordCreatePage() {
   useDidShow(() => {
     loadWorkspaces()
   })
+
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setMembers([])
+      setAssigneeId(undefined)
+      return
+    }
+
+    let active = true
+
+    getWorkspaceMembers(workspaceId)
+      .then((data) => {
+        if (!active) return
+        setMembers(data || [])
+        setAssigneeId((current) => {
+          if (!current) return current
+          return (data || []).some((item) => item.user_id === current)
+            ? current
+            : undefined
+        })
+      })
+      .catch((err) => {
+        console.error(err)
+        if (active) {
+          setMembers([])
+          setAssigneeId(undefined)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [workspaceId])
+
 
   const handleSubmit = async () => {
     if (submitting) return
@@ -168,6 +228,7 @@ export default function RecordCreatePage() {
         workspace_id: workspaceId,
         title: title.trim(),
         content: content.trim(),
+        assignee_id: assigneeId,
         due_at: dueAt,
       })
 
@@ -265,6 +326,42 @@ export default function RecordCreatePage() {
             maxlength={1000}
             onInput={(e) => setContent(e.detail.value)}
           />
+        </View>
+
+        <View className='form-item'>
+          <Text className='form-label'>负责人</Text>
+
+          {memberOptions.length === 0 ? (
+            <View className='empty-member'>暂无成员可选</View>
+          ) : (
+            <Picker
+              mode='selector'
+              range={memberOptions.map((item) => item.label)}
+              value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0}
+              onChange={(e) => {
+                const index = Number(e.detail.value)
+                const selected = memberOptions[index]
+                if (selected) {
+                  setAssigneeId(selected.value)
+                }
+              }}
+            >
+              <View className='picker-value'>
+                {selectedAssigneeName}
+              </View>
+            </Picker>
+          )}
+
+          {assigneeId && (
+            <View
+              className='clear-time'
+              onClick={() => {
+                setAssigneeId(undefined)
+              }}
+            >
+              清除负责人
+            </View>
+          )}
         </View>
 
         <View className='form-item'>

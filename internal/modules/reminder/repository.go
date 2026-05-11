@@ -98,6 +98,58 @@ func (r *Repository) Create(ctx context.Context, params CreateReminderParams) (*
 	return &item, nil
 }
 
+func (r *Repository) ListByRecord(ctx context.Context, recordID int64) ([]Reminder, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			rm.id,
+			rm.record_id,
+		rec.workspace_id,
+		rec.title,
+		rec.assignee_id,
+		rm.remind_at,
+		rm.repeat_type,
+		rm.notified,
+		rm.created_at
+		FROM reminders rm
+		INNER JOIN records rec ON rec.id = rm.record_id
+		WHERE rm.record_id = $1
+		ORDER BY rm.remind_at ASC, rm.created_at ASC
+	`, recordID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	list := make([]Reminder, 0)
+
+	for rows.Next() {
+		var item Reminder
+
+		if err := rows.Scan(
+			&item.ID,
+			&item.RecordID,
+			&item.WorkspaceID,
+			&item.RecordTitle,
+			&item.AssigneeID,
+			&item.RemindAt,
+			&item.RepeatType,
+			&item.Notified,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		list = append(list, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func (r *Repository) ListToday(ctx context.Context, userID int64, start, end time.Time) ([]Reminder, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT

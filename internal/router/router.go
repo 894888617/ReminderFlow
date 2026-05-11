@@ -124,6 +124,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 			authGroup.POST("/workspaces", workspaceHandler.Create)
 			authGroup.GET("/workspaces", workspaceHandler.ListMine)
+			authGroup.DELETE("/workspaces/:id", workspaceHandler.Delete)
 
 			authGroup.POST("/workspaces/:id/members", workspaceHandler.AddMember)
 			authGroup.GET("/workspaces/:id/members", workspaceHandler.ListMembers)
@@ -145,11 +146,13 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.PUT("/records/:id/status", recordHandler.UpdateStatus)
 
 			authGroup.POST("/records/:id/reminders", reminderHandler.Create)
+			authGroup.GET("/records/:id/reminders", reminderHandler.ListByRecord)
 			authGroup.GET("/reminders/today", reminderHandler.ListToday)
 			authGroup.GET("/reminders/upcoming", reminderHandler.ListUpcoming)
 
 			authGroup.GET("/notifications", notificationHandler.List)
 			authGroup.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
+			authGroup.DELETE("/notifications/:id", notificationHandler.Delete)
 
 			authGroup.GET("/todos/today", todoHandler.Today)
 

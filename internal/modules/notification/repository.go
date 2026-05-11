@@ -102,3 +102,13 @@ func (r *Repository) MarkAsRead(ctx context.Context, notificationID, userID int6
 
 	return err
 }
+
+func (r *Repository) Delete(ctx context.Context, notificationID, userID int64) error {
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM notifications
+		WHERE id = $1
+		  AND user_id = $2
+	`, notificationID, userID)
+
+	return err
+}

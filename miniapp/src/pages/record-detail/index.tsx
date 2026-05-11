@@ -3,6 +3,7 @@ import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 
 import {
+  deleteRecord,
   getRecordDetail,
   getRecordLogs,
   updateRecordStatus,
@@ -11,11 +12,17 @@ import {
   type RecordStatus,
 } from '../../api/record'
 import {
+  canDeleteRecord,
   canEditRecord,
   canUpdateRecordStatus,
   canCreateReminder,
 } from '../../utils/permission'
-import { createReminder, type RepeatType } from '../../api/reminder'
+import {
+  createReminder,
+  getRecordReminders,
+  type ReminderItem,
+  type RepeatType,
+} from '../../api/reminder'
 
 import './index.scss'
 
@@ -55,6 +62,21 @@ function formatDateTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 16)
 }
 
+function repeatText(value?: string) {
+  switch (value) {
+    case 'DAILY':
+      return '每天'
+    case 'WEEKLY':
+      return '每周'
+    case 'MONTHLY':
+      return '每月'
+    case 'NONE':
+      return '不重复'
+    default:
+      return value || '-'
+  }
+}
+
 function buildDateTime(date: string, time: string) {
   if (!date || !time) return undefined
   return `${date}T${time}:00+08:00`
@@ -81,9 +103,14 @@ export default function RecordDetailPage() {
 
   const [record, setRecord] = useState<RecordItem | null>(null)
   const [logs, setLogs] = useState<OperationLog[]>([])
+  const [reminders, setReminders] = useState<ReminderItem[]>([])
+
+  const currentUser = Taro.getStorageSync('user')
+  const currentUserId = Number(currentUser?.id || 0)
 
   const role = record?.current_user_role || ''
   const editable = canEditRecord(role)
+  const deletable = canDeleteRecord(role, currentUserId, record?.creator_id)
   const canChangeStatus = canUpdateRecordStatus(role)
   const canSetReminder = canCreateReminder(role)
 
@@ -91,6 +118,7 @@ export default function RecordDetailPage() {
   const [remindTime, setRemindTime] = useState('')
   const [repeatIndex, setRepeatIndex] = useState(0)
   const [submittingReminder, setSubmittingReminder] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const statusIndex = statusOptions.findIndex((item) => item.value === record?.status)
 
@@ -113,13 +141,15 @@ export default function RecordDetailPage() {
     }
 
     try {
-      const [detail, logList] = await Promise.all([
+      const [detail, logList, reminderList] = await Promise.all([
         getRecordDetail(recordId),
         getRecordLogs(recordId),
+        getRecordReminders(recordId),
       ])
 
       setRecord(detail)
       setLogs(logList || [])
+      setReminders(reminderList || [])
     } catch (err) {
       console.error(err)
     }
@@ -218,12 +248,63 @@ export default function RecordDetailPage() {
       setRemindDate('')
       setRemindTime('')
       setRepeatIndex(0)
+      await loadData()
     } catch (err) {
       console.error(err)
       Taro.hideLoading()
     } finally {
       setSubmittingReminder(false)
     }
+  }
+
+
+  const handleDelete = () => {
+    if (!record || deleting) return
+
+    if (!deletable) {
+      Taro.showToast({
+        title: '无删除权限',
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.showModal({
+      title: '确认删除记录',
+      content: '删除后不可恢复，确认继续吗？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        try {
+          setDeleting(true)
+          Taro.showLoading({
+            title: '删除中',
+            mask: true,
+          })
+
+          await deleteRecord(record.id)
+
+          Taro.hideLoading()
+          Taro.showToast({
+            title: '删除成功',
+            icon: 'success',
+          })
+
+          setTimeout(() => {
+            Taro.redirectTo({
+              url: `/pages/workspace-detail/index?id=${record.workspace_id}`,
+            })
+          }, 500)
+        } catch (err) {
+          console.error(err)
+          Taro.hideLoading()
+        } finally {
+          setDeleting(false)
+        }
+      },
+    })
   }
 
   if (!record) {
@@ -253,6 +334,15 @@ export default function RecordDetailPage() {
               }}
             >
               编辑
+            </View>
+          )}
+
+          {deletable && (
+            <View
+              className={deleting ? 'delete-header-btn disabled' : 'delete-header-btn'}
+              onClick={handleDelete}
+            >
+              {deleting ? '删除中' : '删除'}
             </View>
           )}
 
@@ -319,6 +409,23 @@ export default function RecordDetailPage() {
           <Text className='info-value'>{formatDateTime(record.updated_at)}</Text>
         </View>
       </View>
+
+      <View className='section-title'>当前提醒</View>
+
+      {reminders.length === 0 ? (
+        <View className='empty-box'>暂无提醒</View>
+      ) : (
+        <View className='reminder-list'>
+          {reminders.map((item) => (
+            <View key={item.id} className='reminder-item'>
+              <View className='reminder-time'>{formatDateTime(item.remind_at)}</View>
+              <View className='reminder-meta'>
+                重复：{repeatText(item.repeat_type)} ｜ {item.notified ? '已通知' : '未通知'}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {canSetReminder ? (
         <>
