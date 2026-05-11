@@ -13,7 +13,7 @@ import {
   type RecordStatus,
 } from '../../api/record'
 import { createWorkspaceInvite } from '../../api/invite'
-import { deleteWorkspace } from '../../api/workspace'
+import { deleteWorkspace, getWorkspaces } from '../../api/workspace'
 import {
   canCreateRecord,
   canDeleteRecord,
@@ -62,10 +62,13 @@ export default function WorkspaceDetailPage() {
   const router = useRouter()
 
   const workspaceId = Number(router.params.id)
-  const workspaceName = decodeURIComponent(router.params.name || '')
-  const role = router.params.role || ''
+  const initialWorkspaceName = decodeURIComponent(String(router.params.name || ''))
+  const initialRole = String(router.params.role || '')
   const currentUser = Taro.getStorageSync('user')
   const currentUserId = Number(currentUser?.id || 0)
+
+  const [workspaceName, setWorkspaceName] = useState(initialWorkspaceName)
+  const [role, setRole] = useState(initialRole)
 
   const [inviteRole, setInviteRole] = useState<'member' | 'viewer'>('member')
   const [inviteExpireIndex, setInviteExpireIndex] = useState(1)
@@ -102,6 +105,23 @@ export default function WorkspaceDetailPage() {
     { label: '30 天', value: 24 * 30 },
   ]
 
+  const loadWorkspaceMeta = async () => {
+    const workspaces = await getWorkspaces()
+    const currentWorkspace = (workspaces || []).find((item) => item.id === workspaceId)
+
+    if (!currentWorkspace) {
+      Taro.showToast({
+        title: '未加入该空间或空间不存在',
+        icon: 'none',
+      })
+      return false
+    }
+
+    setWorkspaceName(currentWorkspace.name)
+    setRole(currentWorkspace.role)
+    return true
+  }
+
   const loadData = async (nextKeyword = keyword, nextStatus = status) => {
     const token = Taro.getStorageSync('token')
 
@@ -121,6 +141,9 @@ export default function WorkspaceDetailPage() {
     }
 
     try {
+      const hasWorkspace = await loadWorkspaceMeta()
+      if (!hasWorkspace) return
+
       const data = await getRecords({
         workspace_id: workspaceId,
         page,
