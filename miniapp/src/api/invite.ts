@@ -43,11 +43,15 @@ export function getInviteDetail(code: string) {
   })
 }
 
+export interface AcceptInviteResult {
+  workspace_id: number
+  workspace_name: string
+  role: 'owner' | 'member' | 'viewer'
+  message: string
+}
+
 export function acceptInvite(code: string) {
-  return request<{
-    workspace_id: number
-    message: string
-  }>({
+  return request<AcceptInviteResult>({
     url: `/api/invites/${code}/accept`,
     method: 'POST',
   })

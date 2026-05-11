@@ -31,6 +31,13 @@ type CreateInviteResponse struct {
 	Invite     *WorkspaceInvite `json:"invite"`
 }
 
+type AcceptInviteResponse struct {
+	WorkspaceID   int64  `json:"workspace_id"`
+	WorkspaceName string `json:"workspace_name"`
+	Role          string `json:"role"`
+	Message       string `json:"message"`
+}
+
 func (h *Handler) Create(c *gin.Context) {
 	currentUserID, ok := middleware.GetCurrentUserID(c)
 	if !ok {
@@ -154,9 +161,17 @@ func (h *Handler) Accept(c *gin.Context) {
 	}
 
 	if exists {
-		response.OK(c, gin.H{
-			"workspace_id": invite.WorkspaceID,
-			"message":      "already joined",
+		currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), invite.WorkspaceID, currentUserID)
+		if err != nil {
+			response.Internal(c, "get member role failed")
+			return
+		}
+
+		response.OK(c, AcceptInviteResponse{
+			WorkspaceID:   invite.WorkspaceID,
+			WorkspaceName: invite.WorkspaceName,
+			Role:          currentRole,
+			Message:       "already joined",
 		})
 		return
 	}
@@ -166,8 +181,10 @@ func (h *Handler) Accept(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{
-		"workspace_id": invite.WorkspaceID,
-		"message":      "joined",
+	response.OK(c, AcceptInviteResponse{
+		WorkspaceID:   invite.WorkspaceID,
+		WorkspaceName: invite.WorkspaceName,
+		Role:          invite.Role,
+		Message:       "joined",
 	})
 }
