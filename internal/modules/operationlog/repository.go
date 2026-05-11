@@ -63,7 +63,7 @@ func (r *Repository) ListByRecordID(ctx context.Context, recordID int64) ([]Oper
 			ol.workspace_id,
 			ol.record_id,
 			ol.user_id,
-			COALESCE(u.username, ''),
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			ol.action,
 			COALESCE(ol.detail, ''),
 			ol.created_at

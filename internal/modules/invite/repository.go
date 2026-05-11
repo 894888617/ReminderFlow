@@ -104,7 +104,7 @@ func (r *Repository) GetInviteByCode(ctx context.Context, code string) (*Workspa
 			wi.workspace_id,
 			ws.name,
 			wi.inviter_id,
-			u.username,
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			wi.invite_code,
 			wi.role,
 			wi.expire_at,

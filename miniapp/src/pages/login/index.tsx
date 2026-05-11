@@ -1,6 +1,6 @@
 import { View, Text } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { wechatMiniLogin } from '../../api/auth'
+import { MiniLoginParams, wechatMiniLogin } from '../../api/auth'
 import './index.scss'
 
 export default function LoginPage() {
@@ -8,6 +8,21 @@ export default function LoginPage() {
     let loadingShown = false
 
     try {
+      let profile: Taro.getUserProfile.SuccessCallbackResult | undefined
+
+      try {
+        profile = await Taro.getUserProfile({
+          desc: '用于完善登录后的账号昵称和头像',
+        })
+      } catch (profileErr) {
+        console.warn('get user profile cancelled', profileErr)
+        Taro.showToast({
+          title: '请授权微信昵称后登录',
+          icon: 'none',
+        })
+        return
+      }
+
       const loginRes = await Taro.login()
 
       if (!loginRes.code) {
@@ -24,9 +39,19 @@ export default function LoginPage() {
       })
       loadingShown = true
 
-      const result = await wechatMiniLogin({
+      const loginParams: MiniLoginParams = {
         code: loginRes.code,
-      })
+      }
+
+      const userInfo = profile?.userInfo
+      if (userInfo?.nickName) {
+        loginParams.nickname = userInfo.nickName
+      }
+      if (userInfo?.avatarUrl) {
+        loginParams.avatar_url = userInfo.avatarUrl
+      }
+
+      const result = await wechatMiniLogin(loginParams)
 
       Taro.setStorageSync('token', result.token)
       Taro.setStorageSync('user', result.user)
