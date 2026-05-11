@@ -18,6 +18,8 @@ type UserDTO struct {
 	ID        int64  `json:"id"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -27,8 +29,10 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*UserDTO, error) {
 	err := r.db.QueryRow(ctx, `
 		SELECT 
 			id,
-			username,
+			COALESCE(NULLIF(nickname, ''), username, ''),
 			COALESCE(email, ''),
+			COALESCE(nickname, ''),
+			COALESCE(avatar_url, ''),
 			created_at::text
 		FROM users
 		WHERE id = $1
@@ -36,6 +40,8 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*UserDTO, error) {
 		&u.ID,
 		&u.Username,
 		&u.Email,
+		&u.Nickname,
+		&u.AvatarURL,
 		&u.CreatedAt,
 	)
 

@@ -149,7 +149,7 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 			rec.status,
 			rec.due_at,
 			rec.assignee_id,
-			COALESCE(u.username, ''),
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			rec.created_at
 		FROM records rec
 		LEFT JOIN users u ON u.id = rec.assignee_id

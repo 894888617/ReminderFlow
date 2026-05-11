@@ -166,7 +166,7 @@ func (r *Repository) ListMembers(ctx context.Context, workspaceID int64) ([]Work
 			wm.id,
 			wm.workspace_id,
 			wm.user_id,
-			u.username,
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			COALESCE(u.email, ''),
 			wm.role,
 			wm.created_at::text
