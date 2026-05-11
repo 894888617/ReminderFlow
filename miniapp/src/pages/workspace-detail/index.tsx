@@ -58,12 +58,19 @@ function formatDateTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 16)
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
 export default function WorkspaceDetailPage() {
   const router = useRouter()
 
   const workspaceId = Number(router.params.id)
   const initialWorkspaceName = decodeURIComponent(String(router.params.name || ''))
   const initialRole = String(router.params.role || '')
+  const joinedFromInvite = String(router.params.joined || '') === '1'
   const currentUser = Taro.getStorageSync('user')
   const currentUserId = Number(currentUser?.id || 0)
 
@@ -106,20 +113,28 @@ export default function WorkspaceDetailPage() {
   ]
 
   const loadWorkspaceMeta = async () => {
-    const workspaces = await getWorkspaces()
-    const currentWorkspace = (workspaces || []).find((item) => item.id === workspaceId)
+    const maxAttempts = joinedFromInvite ? 3 : 1
 
-    if (!currentWorkspace) {
-      Taro.showToast({
-        title: '未加入该空间或空间不存在',
-        icon: 'none',
-      })
-      return false
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const workspaces = await getWorkspaces()
+      const currentWorkspace = (workspaces || []).find((item) => item.id === workspaceId)
+
+      if (currentWorkspace) {
+        setWorkspaceName(currentWorkspace.name)
+        setRole(currentWorkspace.role)
+        return true
+      }
+
+      if (attempt < maxAttempts) {
+        await delay(400)
+      }
     }
 
-    setWorkspaceName(currentWorkspace.name)
-    setRole(currentWorkspace.role)
-    return true
+    Taro.showToast({
+      title: '未加入该空间或空间不存在',
+      icon: 'none',
+    })
+    return false
   }
 
   const loadData = async (nextKeyword = keyword, nextStatus = status) => {

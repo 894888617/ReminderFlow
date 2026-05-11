@@ -65,9 +65,13 @@ export default function InvitePage() {
     })
   }
 
-  const redirectToWorkspace = async (workspaceId: number) => {
-    let workspaceName = invite?.workspace_name || ''
-    let workspaceRole = invite?.role || ''
+  const redirectToWorkspace = async (
+    workspaceId: number,
+    acceptedWorkspaceName?: string,
+    acceptedWorkspaceRole?: string
+  ) => {
+    let workspaceName = acceptedWorkspaceName || invite?.workspace_name || ''
+    let workspaceRole = acceptedWorkspaceRole || invite?.role || ''
 
     try {
       const workspaces = await getWorkspaces()
@@ -84,7 +88,7 @@ export default function InvitePage() {
     Taro.redirectTo({
       url: `/pages/workspace-detail/index?id=${workspaceId}&name=${encodeURIComponent(
         workspaceName
-      )}&role=${workspaceRole}`,
+      )}&role=${workspaceRole}&joined=1`,
     })
   }
 
@@ -116,7 +120,7 @@ export default function InvitePage() {
       })
 
       setTimeout(() => {
-        redirectToWorkspace(res.workspace_id)
+        redirectToWorkspace(res.workspace_id, res.workspace_name, res.role)
       }, 500)
     } catch (err) {
       console.error(err)
