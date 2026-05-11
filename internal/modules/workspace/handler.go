@@ -343,3 +343,37 @@ func (h *Handler) UpdateMemberRole(c *gin.Context) {
 		"role":         req.Role,
 	})
 }
+
+func (h *Handler) Delete(c *gin.Context) {
+	currentUserID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		response.Unauthorized(c, "unauthorized")
+		return
+	}
+
+	workspaceID, ok := parseWorkspaceID(c)
+	if !ok {
+		return
+	}
+
+	currentRole, err := h.repo.GetMemberRole(c.Request.Context(), workspaceID, currentUserID)
+	if err != nil {
+		response.Forbidden(c, "no permission")
+		return
+	}
+
+	if currentRole != "owner" {
+		response.Forbidden(c, "only owner can delete workspace")
+		return
+	}
+
+	if err := h.repo.Delete(c.Request.Context(), workspaceID); err != nil {
+		response.Internal(c, "delete workspace failed")
+		return
+	}
+
+	response.OK(c, gin.H{
+		"id":      workspaceID,
+		"deleted": true,
+	})
+}

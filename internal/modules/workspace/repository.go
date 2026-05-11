@@ -292,3 +292,12 @@ func (r *Repository) UpdateMemberRole(ctx context.Context, workspaceID, userID i
 
 	return err
 }
+
+func (r *Repository) Delete(ctx context.Context, workspaceID int64) error {
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM workspaces
+		WHERE id = $1
+	`, workspaceID)
+
+	return err
+}

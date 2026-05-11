@@ -3,6 +3,7 @@ import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
 import {
+  deleteNotification,
   getNotifications,
   markNotificationRead,
   type NotificationItem,
@@ -99,6 +100,32 @@ export default function NotificationPage() {
     } catch (err) {
       console.error(err)
     }
+  }
+
+
+  const handleDeleteNotification = (item: NotificationItem) => {
+    Taro.showModal({
+      title: '确认删除通知',
+      content: '删除后不可恢复，确认继续吗？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        try {
+          await deleteNotification(item.id)
+
+          Taro.showToast({
+            title: '删除成功',
+            icon: 'success',
+          })
+
+          await loadData()
+        } catch (err) {
+          console.error(err)
+        }
+      },
+    })
   }
 
   const handleOpenNotification = async (item: NotificationItem) => {
@@ -198,6 +225,16 @@ export default function NotificationPage() {
                         查看记录
                       </Text>
                     )}
+
+                    <Text
+                      className='delete-action'
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteNotification(item)
+                      }}
+                    >
+                      删除
+                    </Text>
                   </View>
                 </View>
               </View>

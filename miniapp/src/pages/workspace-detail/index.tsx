@@ -6,10 +6,17 @@ import Taro, {
 } from '@tarojs/taro'
 import { useState } from 'react'
 
-import { getRecords, type RecordItem, type RecordStatus } from '../../api/record'
+import {
+  deleteRecord,
+  getRecords,
+  type RecordItem,
+  type RecordStatus,
+} from '../../api/record'
 import { createWorkspaceInvite } from '../../api/invite'
+import { deleteWorkspace } from '../../api/workspace'
 import {
   canCreateRecord,
+  canDeleteRecord,
   canInviteMember,
   canViewMembers,
 } from '../../utils/permission'
@@ -57,6 +64,8 @@ export default function WorkspaceDetailPage() {
   const workspaceId = Number(router.params.id)
   const workspaceName = decodeURIComponent(router.params.name || '')
   const role = router.params.role || ''
+  const currentUser = Taro.getStorageSync('user')
+  const currentUserId = Number(currentUser?.id || 0)
 
   const [inviteRole, setInviteRole] = useState<'member' | 'viewer'>('member')
   const [inviteExpireIndex, setInviteExpireIndex] = useState(1)
@@ -72,12 +81,15 @@ export default function WorkspaceDetailPage() {
   const [page] = useState(1)
   const [pageSize] = useState(20)
   const [total, setTotal] = useState(0)
+  const [deletingWorkspace, setDeletingWorkspace] = useState(false)
+  const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null)
 
   // const [inviteTitle, setInviteTitle] = useState('')
 
   const writable = canCreateRecord(role)
   const showInvite = canInviteMember(role)
   const showMembers = canViewMembers(role)
+  const deletableWorkspace = role === 'owner'
 
   const inviteRoleOptions = [
     { label: '成员，可创建和处理记录', value: 'member' },
@@ -217,6 +229,103 @@ export default function WorkspaceDetailPage() {
     loadData(keyword, status)
   }
 
+
+
+  const handleDeleteRecord = (item: RecordItem) => {
+    if (deletingRecordId) return
+
+    if (!canDeleteRecord(role, currentUserId, item.creator_id)) {
+      Taro.showToast({
+        title: '无删除权限',
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.showModal({
+      title: '确认删除记录',
+      content: '删除后不可恢复，确认继续吗？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        try {
+          setDeletingRecordId(item.id)
+          Taro.showLoading({
+            title: '删除中',
+            mask: true,
+          })
+
+          await deleteRecord(item.id)
+
+          Taro.hideLoading()
+          Taro.showToast({
+            title: '删除成功',
+            icon: 'success',
+          })
+
+          await loadData(keyword, status)
+        } catch (err) {
+          console.error(err)
+          Taro.hideLoading()
+        } finally {
+          setDeletingRecordId(null)
+        }
+      },
+    })
+  }
+
+  const handleDeleteWorkspace = () => {
+    if (!workspaceId || deletingWorkspace) return
+
+    if (!deletableWorkspace) {
+      Taro.showToast({
+        title: '只有所有者可以删除空间',
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.showModal({
+      title: '确认删除空间',
+      content: '空间内记录、提醒将一并删除，确认继续吗？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        try {
+          setDeletingWorkspace(true)
+          Taro.showLoading({
+            title: '删除中',
+            mask: true,
+          })
+
+          await deleteWorkspace(workspaceId)
+
+          Taro.hideLoading()
+          Taro.showToast({
+            title: '删除成功',
+            icon: 'success',
+          })
+
+          setTimeout(() => {
+            Taro.switchTab({
+              url: '/pages/workspace/index',
+            })
+          }, 500)
+        } catch (err) {
+          console.error(err)
+          Taro.hideLoading()
+        } finally {
+          setDeletingWorkspace(false)
+        }
+      },
+    })
+  }
+
+
   return (
     <View className='container'>
       <View className='detail-header'>
@@ -228,6 +337,15 @@ export default function WorkspaceDetailPage() {
         </View>
 
         <View className='header-actions'>
+          {deletableWorkspace && (
+            <View
+              className={deletingWorkspace ? 'delete-space-btn disabled' : 'delete-space-btn'}
+              onClick={handleDeleteWorkspace}
+            >
+              {deletingWorkspace ? '删除中' : '删除'}
+            </View>
+          )}
+
           {showMembers && (
             <View
               className='members-btn'
@@ -430,6 +548,15 @@ export default function WorkspaceDetailPage() {
             </View>
           )}
 
+          {deletableWorkspace && (
+            <View
+              className={deletingWorkspace ? 'delete-space-btn disabled' : 'delete-space-btn'}
+              onClick={handleDeleteWorkspace}
+            >
+              {deletingWorkspace ? '删除中' : '删除'}
+            </View>
+          )}
+
           {showMembers && (
             <View
               className='empty-record-link'
@@ -459,7 +586,21 @@ export default function WorkspaceDetailPage() {
             >
               <View className='record-top'>
                 <View className='record-title'>{item.title}</View>
-                <View className={`status-tag ${item.status}`}>{statusText(item.status)}</View>
+                <View className='record-actions'>
+                  <View className={`status-tag ${item.status}`}>{statusText(item.status)}</View>
+
+                  {canDeleteRecord(role, currentUserId, item.creator_id) && (
+                    <View
+                      className={deletingRecordId === item.id ? 'delete-record-btn disabled' : 'delete-record-btn'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteRecord(item)
+                      }}
+                    >
+                      {deletingRecordId === item.id ? '删除中' : '删除'}
+                    </View>
+                  )}
+                </View>
               </View>
 
               {item.content ? (

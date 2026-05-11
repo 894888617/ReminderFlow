@@ -58,3 +58,27 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 		"read": true,
 	})
 }
+
+func (h *Handler) Delete(c *gin.Context) {
+	currentUserID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		response.Unauthorized(c, "unauthorized")
+		return
+	}
+
+	notificationID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || notificationID <= 0 {
+		response.BadRequest(c, "invalid notification id")
+		return
+	}
+
+	if err := h.repo.Delete(c.Request.Context(), notificationID, currentUserID); err != nil {
+		response.Internal(c, "delete notification failed")
+		return
+	}
+
+	response.OK(c, gin.H{
+		"id":      notificationID,
+		"deleted": true,
+	})
+}

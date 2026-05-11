@@ -67,3 +67,11 @@ export function createWorkspace(data: CreateWorkspaceParams) {
     data,
   })
 }
+
+
+export function deleteWorkspace(id: number) {
+  return request({
+    url: `/api/workspaces/${id}`,
+    method: 'DELETE',
+  })
+}

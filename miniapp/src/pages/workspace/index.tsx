@@ -1,7 +1,7 @@
 import { View } from '@tarojs/components'
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
-import { getWorkspaces, type Workspace } from '../../api/workspace'
+import { deleteWorkspace, getWorkspaces, type Workspace } from '../../api/workspace'
 import './index.scss'
 
 function roleText(role: string) {
@@ -19,6 +19,7 @@ function roleText(role: string) {
 
 export default function WorkspacePage() {
   const [list, setList] = useState<Workspace[]>([])
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const loadData = async () => {
     const token = Taro.getStorageSync('token')
@@ -46,6 +47,50 @@ export default function WorkspacePage() {
   useDidShow(() => {
     loadData()
   })
+
+
+  const handleDeleteWorkspace = (item: Workspace) => {
+    if (item.role !== 'owner') {
+      Taro.showToast({
+        title: '只有所有者可以删除空间',
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.showModal({
+      title: '确认删除空间',
+      content: '空间内记录、提醒将一并删除，确认继续吗？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        try {
+          setDeletingId(item.id)
+          Taro.showLoading({
+            title: '删除中',
+            mask: true,
+          })
+
+          await deleteWorkspace(item.id)
+
+          Taro.hideLoading()
+          Taro.showToast({
+            title: '删除成功',
+            icon: 'success',
+          })
+
+          await loadData()
+        } catch (err) {
+          console.error(err)
+          Taro.hideLoading()
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
+  }
 
   return (
     <View className='container'>
@@ -108,8 +153,22 @@ export default function WorkspacePage() {
                 <View className='workspace-meta'>更新时间：{formatDateTime(item.updated_at)}</View>
               </View>
 
-              <View className={`role-tag ${item.role}`}>
-                {roleText(item.role)}
+              <View className='workspace-side'>
+                <View className={`role-tag ${item.role}`}>
+                  {roleText(item.role)}
+                </View>
+
+                {item.role === 'owner' && (
+                  <View
+                    className={deletingId === item.id ? 'delete-space-btn disabled' : 'delete-space-btn'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteWorkspace(item)
+                    }}
+                  >
+                    {deletingId === item.id ? '删除中' : '删除'}
+                  </View>
+                )}
               </View>
             </View>
           ))}

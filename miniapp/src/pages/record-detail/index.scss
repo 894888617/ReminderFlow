@@ -192,3 +192,40 @@
   margin: 24px 0;
   line-height: 1.5;
 }
+
+.delete-header-btn {
+  flex-shrink: 0;
+  font-size: 24px;
+  color: #ffffff;
+  background: #ef4444;
+  border-radius: 999px;
+  padding: 12px 20px;
+}
+
+.delete-header-btn.disabled {
+  background: #fca5a5;
+}
+
+.reminder-list {
+  padding-bottom: 4px;
+}
+
+.reminder-item {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.reminder-time {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.reminder-meta {
+  font-size: 24px;
+  color: #6b7280;
+}
