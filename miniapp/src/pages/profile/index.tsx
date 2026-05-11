@@ -1,10 +1,28 @@
 import { View, Text } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
+import { getMe, type MiniUser } from '../../api/auth'
 import { recordSubscription, SUBSCRIBE_SCENE } from '../../api/subscription'
+import { getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
 import './index.scss'
+import { useState } from 'react'
 
 export default function ProfilePage() {
-  const user = Taro.getStorageSync('user')
+  const [user, setUser] = useState<MiniUser | null>(() => Taro.getStorageSync('user') || null)
+
+  useDidShow(() => {
+    const token = Taro.getStorageSync('token')
+
+    if (!token) return
+
+    getMe()
+      .then((data) => {
+        setUser(data)
+        Taro.setStorageSync('user', data)
+      })
+      .catch((err) => {
+        console.error(err)
+      })
+  })
 
   const TASK_REMINDER_TEMPLATE_ID = '你的任务提醒模板ID'
   const OVERDUE_TEMPLATE_ID = '你的逾期提醒模板ID'
@@ -87,8 +105,15 @@ export default function ProfilePage() {
       <View className='page-title'>我的</View>
       <View className='page-desc'>账号信息和系统设置。</View>
 
-      <View className='card'>
-        <Text>用户：{user?.nickname || user?.username || '-'}</Text>
+      <View className='card account-card'>
+        <Text className='account-name'>用户：{getWechatDisplayName(user)}</Text>
+        {user?.nickname && user?.username && user.nickname !== user.username && (
+          <Text className='account-line'>账号：{user.username}</Text>
+        )}
+        {getMaskedWechatID(user) && (
+          <Text className='account-line'>微信标识：{getMaskedWechatID(user)}</Text>
+        )}
+        <Text className='account-line'>用户 ID：{user?.id || '-'}</Text>
       </View>
 
       <View className='secondary-btn' onClick={handleSubscribeMessage}>

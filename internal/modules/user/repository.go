@@ -15,12 +15,14 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 type UserDTO struct {
-	ID        int64  `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatar_url"`
-	CreatedAt string `json:"created_at"`
+	ID            int64  `json:"id"`
+	Username      string `json:"username"`
+	Email         string `json:"email"`
+	WechatOpenID  string `json:"wechat_openid"`
+	WechatUnionID string `json:"wechat_unionid"`
+	Nickname      string `json:"nickname"`
+	AvatarURL     string `json:"avatar_url"`
+	CreatedAt     string `json:"created_at"`
 }
 
 func (r *Repository) FindByID(ctx context.Context, id int64) (*UserDTO, error) {
@@ -29,8 +31,10 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*UserDTO, error) {
 	err := r.db.QueryRow(ctx, `
 		SELECT 
 			id,
-			COALESCE(NULLIF(nickname, ''), username, ''),
+			COALESCE(username, ''),
 			COALESCE(email, ''),
+			COALESCE(wechat_openid, ''),
+			COALESCE(wechat_unionid, ''),
 			COALESCE(nickname, ''),
 			COALESCE(avatar_url, ''),
 			created_at::text
@@ -40,6 +44,8 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*UserDTO, error) {
 		&u.ID,
 		&u.Username,
 		&u.Email,
+		&u.WechatOpenID,
+		&u.WechatUnionID,
 		&u.Nickname,
 		&u.AvatarURL,
 		&u.CreatedAt,
