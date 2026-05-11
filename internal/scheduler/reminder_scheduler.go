@@ -49,13 +49,19 @@ func (s *ReminderScheduler) Start() {
 }
 
 type DueReminder struct {
-	ReminderID  int64
+	ReminderID   int64
+	RecordID     int64
+	RecordTitle  string
+	NotifyUserID int64
+	RemindAt     time.Time
+	RepeatType   string
+}
+
+type pendingReminderPush struct {
+	UserID      int64
 	RecordID    int64
 	RecordTitle string
-	AssigneeID  *int64
-	CreatorID   int64
 	RemindAt    time.Time
-	RepeatType  string
 }
 
 func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
@@ -70,8 +76,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			rm.id,
 			rm.record_id,
 			rec.title,
-			COALESCE(rec.assignee_id, 0),
-			rec.creator_id,
+			COALESCE(rec.assignee_id, rec.creator_id),
 			rm.remind_at,
 			rm.repeat_type
 		FROM reminders rm
@@ -89,8 +94,6 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		return err
 	}
 
-	defer rows.Close()
-
 	dueList := make([]DueReminder, 0)
 
 	for rows.Next() {
@@ -100,37 +103,26 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			&item.ReminderID,
 			&item.RecordID,
 			&item.RecordTitle,
-			&item.AssigneeID,
-			&item.CreatorID,
+			&item.NotifyUserID,
 			&item.RemindAt,
 			&item.RepeatType,
 		); err != nil {
 			log.Println("scan due reminder row failed:", err)
 			continue
-			//rows.Close()
-			//return err
 		}
 
 		dueList = append(dueList, item)
 	}
 
+	rows.Close()
 	if err := rows.Err(); err != nil {
 		log.Println("iterate due reminders failed:", err)
 		return err
 	}
 
+	pendingPushes := make([]pendingReminderPush, 0, len(dueList))
+
 	for _, item := range dueList {
-		notifyUserID := item.CreatorID
-		if item.AssigneeID != nil {
-			notifyUserID = *item.AssigneeID
-		}
-
-		tx, err := s.db.Begin(ctx)
-		if err != nil {
-			log.Println("begin reminder tx failed:", err)
-			continue
-		}
-
 		title := "任务提醒"
 		content := fmt.Sprintf("记录「%s」已到提醒时间，请及时处理。", item.RecordTitle)
 
@@ -144,58 +136,60 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 				created_at
 			)
 			VALUES ($1, $2, $3, $4, false, NOW())
-		`, notifyUserID, item.RecordID, title, content)
+		`, item.NotifyUserID, item.RecordID, title, content)
 
 		if err != nil {
-			_ = tx.Rollback(ctx)
 			log.Println("create reminder notification failed:", err)
-			continue
+			return err
 		}
 
-		if err := tx.Commit(ctx); err != nil {
-			log.Println("commit reminder tx failed:", err)
-			continue
+		if item.RepeatType == "NONE" {
+			_, err = tx.Exec(ctx, `
+				UPDATE reminders
+				SET notified = true
+				WHERE id = $1
+			`, item.ReminderID)
+		} else {
+			nextRemindAt := nextReminderTime(item.RemindAt, item.RepeatType)
+
+			_, err = tx.Exec(ctx, `
+				UPDATE reminders
+				SET remind_at = $2
+				WHERE id = $1
+			`, item.ReminderID, nextRemindAt)
 		}
 
-		if s.subscriptionService != nil {
-			err := s.subscriptionService.SendTaskReminder(ctx, subscription.SendTaskReminderParams{
-				UserID:      notifyUserID,
-				RecordID:    item.RecordID,
-				RecordTitle: item.RecordTitle,
-				RemindTime:  item.RemindAt.Format("2006-01-02 15:04"),
-			})
-			if err != nil {
-				log.Println("send wechat task reminder failed:", err)
-			}
+		if err != nil {
+			log.Println("update reminder after notification failed:", err)
+			return err
 		}
 
-		//if item.RepeatType == "NONE" {
-		//	_, err = tx.Exec(ctx, `
-		//		UPDATE reminders
-		//		SET notified = true
-		//		WHERE id = $1
-		//	`, item.ReminderID)
-		//
-		//	if err != nil {
-		//		return err
-		//	}
-		//} else {
-		//	nextRemindAt := nextReminderTime(item.RemindAt, item.RepeatType)
-		//
-		//	_, err = tx.Exec(ctx, `
-		//		UPDATE reminders
-		//		SET remind_at = $2
-		//		WHERE id = $1
-		//	`, item.ReminderID, nextRemindAt)
-		//
-		//	if err != nil {
-		//		return err
-		//	}
-		//}
+		pendingPushes = append(pendingPushes, pendingReminderPush{
+			UserID:      item.NotifyUserID,
+			RecordID:    item.RecordID,
+			RecordTitle: item.RecordTitle,
+			RemindAt:    item.RemindAt,
+		})
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return err
+	}
+
+	for _, item := range pendingPushes {
+		if s.subscriptionService == nil {
+			continue
+		}
+
+		err := s.subscriptionService.SendTaskReminder(ctx, subscription.SendTaskReminderParams{
+			UserID:      item.UserID,
+			RecordID:    item.RecordID,
+			RecordTitle: item.RecordTitle,
+			RemindTime:  item.RemindAt.Format("2006-01-02 15:04"),
+		})
+		if err != nil {
+			log.Println("send wechat task reminder failed:", err)
+		}
 	}
 
 	if len(dueList) > 0 {
