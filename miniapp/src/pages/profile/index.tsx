@@ -3,8 +3,9 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { getMe, type MiniUser } from '../../api/auth'
 import { recordSubscription, SUBSCRIBE_SCENE } from '../../api/subscription'
-import { getWechatDisplayName } from '../../utils/userDisplay'
+import { getCollaborationID, getWechatDisplayName } from '../../utils/userDisplay'
 import { clearLoginSession, getStoredToken, getStoredUser } from '../../utils/auth'
+import { copyTextToClipboard } from '../../utils/clipboard'
 import './index.scss'
 
 export default function ProfilePage() {
@@ -37,8 +38,8 @@ export default function ProfilePage() {
     })
   }
 
-  const accountID = user?.username || ''
-  const handleCopy = (label: string, value?: string) => {
+  const accountID = getCollaborationID(user) || user?.username?.trim() || ''
+  const handleCopy = async (label: string, value?: string) => {
     if (!value) {
       Taro.showToast({
         title: `${label}为空`,
@@ -47,21 +48,21 @@ export default function ProfilePage() {
       return
     }
 
-    Taro.setClipboardData({
-      data: value,
-      success: () => {
-        Taro.showToast({
-          title: `${label}已复制`,
-          icon: 'success',
-        })
-      },
-      fail: () => {
-        Taro.showToast({
-          title: '复制失败',
-          icon: 'none',
-        })
-      },
-    })
+    try {
+      await copyTextToClipboard(value)
+
+      Taro.showToast({
+        title: `${label}已复制`,
+        icon: 'success',
+      })
+    } catch (err) {
+      console.error('copy account failed', err)
+      Taro.showModal({
+        title: '复制失败',
+        content: `${label}：${value}，请长按账号手动复制`,
+        showCancel: false,
+      })
+    }
   }
 
   const handleSubscribeMessage = async () => {
@@ -138,7 +139,7 @@ export default function ProfilePage() {
         <View className='account-copy-row'>
           <View className='account-copy-main'>
             <Text className='account-copy-label'>账号</Text>
-            <Text className='account-copy-value'>{accountID || '-'}</Text>
+            <Text className='account-copy-value' selectable>{accountID || '-'}</Text>
           </View>
 
           <View
