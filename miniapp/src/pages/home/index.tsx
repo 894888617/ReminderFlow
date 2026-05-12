@@ -102,24 +102,6 @@ export default function HomePage() {
         </View>
       </View>
 
-
-      <View className='ai-assistant-card'>
-        <View>
-          <View className='ai-assistant-title'>AI 语音助理</View>
-          <View className='ai-assistant-desc'>说一句话，让助理帮你创建记录、更新进度或管理人员。</View>
-        </View>
-        <View
-          className='ai-assistant-btn'
-          onClick={() => {
-            Taro.navigateTo({
-              url: '/pages/ai-assistant/index',
-            })
-          }}
-        >
-          去使用
-        </View>
-      </View>
-
       <View className='summary-grid'>
         <View className='summary-card'>
           <Text className='summary-value'>{data?.today_due_count || 0}</Text>
