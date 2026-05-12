@@ -1,27 +1,64 @@
-import { View, Text } from '@tarojs/components'
+import { Button, Input, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { useState } from 'react'
 import { MiniLoginParams, wechatMiniLogin } from '../../api/auth'
+import { openPrivacyContract, requestPrivacyAuthorize } from '../../utils/wechatPrivacy'
 import './index.scss'
 
+const DEFAULT_LOGIN_NAME_TIP = '不填写将使用默认名称'
+
 export default function LoginPage() {
+  const [nickname, setNickname] = useState('')
+  const [privacyAgreed, setPrivacyAgreed] = useState(false)
+
+  const handleNicknameInput = (event) => {
+    setNickname(String(event.detail?.value || '').slice(0, 32))
+  }
+
+  const handlePrivacyClick = () => {
+    setPrivacyAgreed((value) => !value)
+  }
+
+  const handleOpenPrivacy = async () => {
+    try {
+      await openPrivacyContract()
+    } catch (err) {
+      console.error('open privacy contract failed', err)
+      Taro.showToast({
+        title: '隐私协议暂时无法打开',
+        icon: 'none',
+      })
+    }
+  }
+
+  const ensurePrivacyAuthorized = async () => {
+    if (!privacyAgreed) {
+      Taro.showToast({
+        title: '请先同意隐私协议',
+        icon: 'none',
+      })
+      return false
+    }
+
+    try {
+      await requestPrivacyAuthorize()
+      return true
+    } catch (err) {
+      console.error('privacy authorization denied', err)
+      Taro.showToast({
+        title: '需要同意隐私协议后登录',
+        icon: 'none',
+      })
+      return false
+    }
+  }
+
   const handleWechatLogin = async () => {
     let loadingShown = false
 
     try {
-      let profile: Taro.getUserProfile.SuccessCallbackResult | undefined
-
-      try {
-        profile = await Taro.getUserProfile({
-          desc: '用于完善登录后的账号昵称和头像',
-        })
-      } catch (profileErr) {
-        console.warn('get user profile cancelled', profileErr)
-        Taro.showToast({
-          title: '请授权微信昵称后登录',
-          icon: 'none',
-        })
-        return
-      }
+      const privacyReady = await ensurePrivacyAuthorized()
+      if (!privacyReady) return
 
       const loginRes = await Taro.login()
 
@@ -39,16 +76,13 @@ export default function LoginPage() {
       })
       loadingShown = true
 
+      const trimmedNickname = nickname.trim()
       const loginParams: MiniLoginParams = {
         code: loginRes.code,
       }
 
-      const userInfo = profile?.userInfo
-      if (userInfo?.nickName) {
-        loginParams.nickname = userInfo.nickName
-      }
-      if (userInfo?.avatarUrl) {
-        loginParams.avatar_url = userInfo.avatarUrl
+      if (trimmedNickname) {
+        loginParams.nickname = trimmedNickname
       }
 
       const result = await wechatMiniLogin(loginParams)
@@ -93,9 +127,35 @@ export default function LoginPage() {
           协同记录、定时提醒、状态跟踪，适合个人和小团队使用。
         </Text>
 
-        <View className='wechat-btn' onClick={handleWechatLogin}>
-          微信一键登录
+        <View className='profile-form'>
+          <Text className='field-label'>登录昵称（选填）</Text>
+          <Input
+            className='nickname-input'
+            type='nickname'
+            maxlength={32}
+            placeholder={DEFAULT_LOGIN_NAME_TIP}
+            value={nickname}
+            onInput={handleNicknameInput}
+          />
+          <Text className='field-help'>
+            微信登录不再自动返回头像昵称，可手动填写昵称；留空将使用系统默认名称。
+          </Text>
         </View>
+
+        <View className='privacy-row'>
+          <View
+            className={`privacy-checkbox ${privacyAgreed ? 'privacy-checkbox-checked' : ''}`}
+            onClick={handlePrivacyClick}
+          >
+            {privacyAgreed ? '✓' : ''}
+          </View>
+          <Text className='privacy-text' onClick={handlePrivacyClick}>我已阅读并同意</Text>
+          <Text className='privacy-link' onClick={handleOpenPrivacy}>《用户隐私保护指引》</Text>
+        </View>
+
+        <Button className='wechat-btn' onClick={handleWechatLogin}>
+          微信登录
+        </Button>
 
         <Text className='login-tip'>
           登录后即可创建空间、记录任务并设置提醒。
