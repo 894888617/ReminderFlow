@@ -13,6 +13,7 @@ import { canCreateRecord } from '../../utils/permission'
 import { createReminder, type RepeatType } from '../../api/reminder'
 
 import { getStoredToken } from '../../utils/auth'
+import { getUserNameDisplay } from '../../utils/userDisplay'
 import './index.scss'
 
 const repeatOptions: { label: string; value: RepeatType }[] = [
@@ -79,7 +80,7 @@ export default function RecordCreatePage() {
 
   const memberOptions = useMemo(() => {
     return members.map((item) => ({
-      label: item.username || `用户 ${item.user_id}`,
+      label: getUserNameDisplay(item),
       value: item.user_id,
     }))
   }, [members])

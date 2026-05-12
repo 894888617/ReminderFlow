@@ -25,6 +25,22 @@ export function getWechatDisplayName(user?: WechatUserDisplayFields | null) {
   return user.nickname || getCollaborationID(user) || user.username || getMaskedWechatID(user) || '-'
 }
 
+export function getUserNameDisplay(user?: WechatUserDisplayFields | null) {
+  if (!user) return '未命名用户'
+
+  const nickname = user.nickname?.trim()
+  if (nickname) return nickname
+
+  const username = user.username?.trim()
+  if (username && !isGeneratedWechatUsername(username)) return username
+
+  return '未命名用户'
+}
+
+function isGeneratedWechatUsername(username: string) {
+  return username.startsWith('wx_')
+}
+
 export function getMaskedWechatID(user?: WechatUserDisplayFields | null) {
   const id = user?.wechat_unionid || user?.wechat_openid || ''
 
