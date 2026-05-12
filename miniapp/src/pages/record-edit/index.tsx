@@ -18,6 +18,7 @@ import {
 } from '../../utils/permission'
 
 import { getStoredToken } from '../../utils/auth'
+import { getUserNameDisplay } from '../../utils/userDisplay'
 import './index.scss'
 
 function buildDateTime(date: string, time: string) {
@@ -82,7 +83,7 @@ export default function RecordEditPage() {
 
   const memberOptions = useMemo(() => {
     return members.map((item) => ({
-      label: item.username || `用户 ${item.user_id}`,
+      label: getUserNameDisplay(item),
       value: item.user_id,
     }))
   }, [members])
