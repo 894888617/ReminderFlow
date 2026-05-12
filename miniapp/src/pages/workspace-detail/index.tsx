@@ -1,9 +1,5 @@
-import { View, Text, Input, Picker, Button } from '@tarojs/components'
-import Taro, {
-  useDidShow,
-  useRouter,
-  useShareAppMessage,
-} from '@tarojs/taro'
+import { View, Text, Input } from '@tarojs/components'
+import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 
 import {
@@ -12,12 +8,10 @@ import {
   type RecordItem,
   type RecordStatus,
 } from '../../api/record'
-import { createWorkspaceInvite } from '../../api/invite'
 import { deleteWorkspace, getWorkspaces } from '../../api/workspace'
 import {
   canCreateRecord,
   canDeleteRecord,
-  canInviteMember,
   canViewMembers,
 } from '../../utils/permission'
 
@@ -78,13 +72,6 @@ export default function WorkspaceDetailPage() {
   const [workspaceName, setWorkspaceName] = useState(initialWorkspaceName)
   const [role, setRole] = useState(initialRole)
 
-  const [inviteRole, setInviteRole] = useState<'member' | 'viewer'>('member')
-  const [inviteExpireIndex, setInviteExpireIndex] = useState(1)
-
-  const [invitePath, setInvitePath] = useState('')
-  const [inviteCode, setInviteCode] = useState('')
-  const [inviteVisible, setInviteVisible] = useState(false)
-  const [invitePanelVisible, setInvitePanelVisible] = useState(false)
 
   const [records, setRecords] = useState<RecordItem[]>([])
   const [keyword, setKeyword] = useState('')
@@ -95,23 +82,9 @@ export default function WorkspaceDetailPage() {
   const [deletingWorkspace, setDeletingWorkspace] = useState(false)
   const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null)
 
-  // const [inviteTitle, setInviteTitle] = useState('')
-
   const writable = canCreateRecord(role)
-  const showInvite = canInviteMember(role)
   const showMembers = canViewMembers(role)
   const deletableWorkspace = role === 'owner'
-
-  const inviteRoleOptions = [
-    { label: '成员，可创建和处理记录', value: 'member' },
-    { label: '只读，仅查看记录', value: 'viewer' },
-  ]
-
-  const inviteExpireOptions = [
-    { label: '24 小时', value: 24 },
-    { label: '7 天', value: 24 * 7 },
-    { label: '30 天', value: 24 * 30 },
-  ]
 
   const loadWorkspaceMeta = async () => {
     const maxAttempts = joinedFromInvite ? 3 : 1
@@ -180,89 +153,11 @@ export default function WorkspaceDetailPage() {
   })
 
 
-  const resetInviteCard = () => {
-    setInvitePanelVisible(false)
-    setInviteVisible(false)
-    setInviteCode('')
-    setInvitePath('')
-  }
-
-  const openInvitePanel = () => {
-    setInvitePanelVisible(true)
-
-    Taro.nextTick(() => {
-      Taro.pageScrollTo({
-        scrollTop: 0,
-        duration: 300,
-      })
-    })
-  }
-
-  useShareAppMessage(() => {
-    const sharePath = invitePath || `/pages/workspace/index`
-
-    if (invitePanelVisible && inviteVisible) {
-      setTimeout(() => {
-        resetInviteCard()
-      }, 800)
-    }
-
-    return {
-      title: `邀请你加入「${workspaceName || '协作空间'}」`,
-      path: sharePath,
-    }
-  })
-
   const handleStatusFilter = (nextStatus: RecordStatus | '') => {
     setStatus(nextStatus)
     loadData(keyword, nextStatus)
   }
 
-  const handleCreateInvite = async () => {
-    if (!workspaceId) {
-      Taro.showToast({
-        title: '空间 ID 缺失',
-        icon: 'none',
-      })
-      return
-    }
-
-    if (role !== 'owner') {
-      Taro.showToast({
-        title: '只有所有者可以邀请成员',
-        icon: 'none',
-      })
-      return
-    }
-
-    try {
-      Taro.showLoading({
-        title: '生成中',
-        mask: true,
-      })
-
-      const res = await createWorkspaceInvite(workspaceId, {
-        role: inviteRole,
-        expire_hours: inviteExpireOptions[inviteExpireIndex].value,
-        max_use_count: 20,
-      })
-
-      Taro.hideLoading()
-
-      setInviteCode(res.invite_code)
-      setInvitePath(res.path)
-      setInviteVisible(true)
-      setInvitePanelVisible(true)
-
-      Taro.showToast({
-        title: '邀请已生成',
-        icon: 'success',
-      })
-    } catch (err) {
-      console.error(err)
-      Taro.hideLoading()
-    }
-  }
 
   const handleSearch = () => {
     loadData(keyword, status)
@@ -400,21 +295,6 @@ export default function WorkspaceDetailPage() {
             </View>
           )}
 
-          {showInvite && (
-            <View
-              className={invitePanelVisible ? 'invite-btn active' : 'invite-btn'}
-              onClick={() => {
-                if (invitePanelVisible) {
-                  resetInviteCard()
-                  return
-                }
-
-                openInvitePanel()
-              }}
-            >
-              {invitePanelVisible ? '收起' : '邀请'}
-            </View>
-          )}
 
           {writable && (
             <View
@@ -431,84 +311,6 @@ export default function WorkspaceDetailPage() {
         </View>
       </View>
 
-      {showInvite && invitePanelVisible && (
-        <View className='invite-panel'>
-          <View className='invite-panel-head'>
-            <View>
-              <View className='invite-panel-title'>邀请成员</View>
-              <View className='invite-panel-subtitle'>设置角色和有效期后生成分享卡片。</View>
-            </View>
-
-            <View className='invite-panel-close' onClick={resetInviteCard}>
-              隐藏
-            </View>
-          </View>
-
-          <View className='invite-form-row'>
-            <Text className='invite-label'>加入角色</Text>
-
-            <Picker
-              mode='selector'
-              range={inviteRoleOptions.map((item) => item.label)}
-              value={inviteRole === 'member' ? 0 : 1}
-              onChange={(e) => {
-                const index = Number(e.detail.value)
-                const selected = inviteRoleOptions[index]
-                if (selected) {
-                  setInviteRole(selected.value as 'member' | 'viewer')
-                  setInviteVisible(false)
-                  setInviteCode('')
-                  setInvitePath('')
-                }
-              }}
-            >
-              <View className='invite-picker'>
-                {inviteRole === 'member' ? '成员' : '只读'}
-              </View>
-            </Picker>
-          </View>
-
-          <View className='invite-form-row'>
-            <Text className='invite-label'>有效期</Text>
-
-            <Picker
-              mode='selector'
-              range={inviteExpireOptions.map((item) => item.label)}
-              value={inviteExpireIndex}
-              onChange={(e) => {
-                setInviteExpireIndex(Number(e.detail.value))
-                setInviteVisible(false)
-                setInviteCode('')
-                setInvitePath('')
-              }}
-            >
-              <View className='invite-picker'>
-                {inviteExpireOptions[inviteExpireIndex].label}
-              </View>
-            </Picker>
-          </View>
-
-          {!inviteVisible ? (
-            <View className='generate-invite-btn' onClick={handleCreateInvite}>
-              生成邀请链接
-            </View>
-          ) : (
-            <View className='invite-result'>
-              <View className='invite-code'>
-                邀请码：{inviteCode}
-              </View>
-
-              <Button className='share-btn' openType='share'>
-                分享给好友
-              </Button>
-
-              <View className='invite-tip'>
-                好友点击分享卡片后，可一键加入该协作空间。
-              </View>
-            </View>
-          )}
-        </View>
-      )}
 
       <View className='search-box'>
         <Input
@@ -575,15 +377,6 @@ export default function WorkspaceDetailPage() {
               }}
             >
               创建第一条记录
-            </View>
-          )}
-
-          {showInvite && (
-            <View
-              className='empty-record-secondary'
-              onClick={openInvitePanel}
-            >
-              邀请成员一起协作
             </View>
           )}
 
