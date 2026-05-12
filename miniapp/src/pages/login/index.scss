@@ -1,11 +1,15 @@
 .login-page {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
+  box-sizing: border-box;
   padding: 80px 32px;
-  background: linear-gradient(180deg, #eaf3ff 0%, #f6f7fb 55%, #ffffff 100%);
+  background: transparent;
 }
 
 .login-card {
-  background: #ffffff;
+  position: relative;
+  background: rgba(255, 255, 255, 0.94);
   border-radius: 28px;
   padding: 48px 36px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
