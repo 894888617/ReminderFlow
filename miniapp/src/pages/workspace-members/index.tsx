@@ -152,6 +152,35 @@ export default function WorkspaceMembersPage() {
     }
   }
 
+  const handlePasteMemberKeyword = async () => {
+    if (!manageable) return
+
+    try {
+      const res = await Taro.getClipboardData()
+      const keyword = String(res.data || '').trim()
+
+      if (!keyword) {
+        Taro.showToast({
+          title: '剪贴板为空',
+          icon: 'none',
+        })
+        return
+      }
+
+      setMemberKeyword(keyword)
+      Taro.showToast({
+        title: '已粘贴账号',
+        icon: 'success',
+      })
+    } catch (err) {
+      console.error(err)
+      Taro.showToast({
+        title: '读取剪贴板失败',
+        icon: 'none',
+      })
+    }
+  }
+
   const handleAddMember = async () => {
     const keyword = memberKeyword.trim()
 
@@ -275,6 +304,10 @@ export default function WorkspaceMembersPage() {
               onInput={(e) => setMemberKeyword(e.detail.value)}
               onConfirm={handleAddMember}
             />
+
+            <View className='paste-member-btn' onClick={handlePasteMemberKeyword}>
+              粘贴
+            </View>
 
             <Picker
               mode='selector'
