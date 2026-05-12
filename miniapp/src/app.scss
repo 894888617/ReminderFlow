@@ -1,15 +1,21 @@
 page {
-  background: #f6f7fb;
-  color: #1f2937;
+  min-height: 100vh;
+  background-color: #dfe9e8;
+  background-image: url('./assets/miniapp-background.jpg');
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;  color: #1f2937;
   font-size: 28px;
 }
 
 .container {
+  min-height: 100vh;
+  box-sizing: border-box;
   padding: 24px;
 }
 
 .card {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 20px;
   padding: 24px;
   margin-bottom: 24px;
