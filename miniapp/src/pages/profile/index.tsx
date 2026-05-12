@@ -37,6 +37,35 @@ export default function ProfilePage() {
     })
   }
 
+  const accountID = user?.username || ''
+  const collaborationID = getCollaborationID(user)
+
+  const handleCopy = (label: string, value?: string) => {
+    if (!value) {
+      Taro.showToast({
+        title: `${label}为空`,
+        icon: 'none',
+      })
+      return
+    }
+
+    Taro.setClipboardData({
+      data: value,
+      success: () => {
+        Taro.showToast({
+          title: `${label}已复制`,
+          icon: 'success',
+        })
+      },
+      fail: () => {
+        Taro.showToast({
+          title: '复制失败',
+          icon: 'none',
+        })
+      },
+    })
+  }
+
   const handleSubscribeMessage = async () => {
     const templateIds = [
       TASK_REMINDER_TEMPLATE_ID,
@@ -107,10 +136,35 @@ export default function ProfilePage() {
 
       <View className='card account-card'>
         <Text className='account-name'>用户：{getWechatDisplayName(user)}</Text>
-        {user?.nickname && user?.username && user.nickname !== user.username && (
-          <Text className='account-line'>账号：{user.username}</Text>
-        )}
-        <Text className='account-line'>协作 ID：{getCollaborationID(user) || '-'}</Text>
+
+        <View className='account-copy-row'>
+          <View className='account-copy-main'>
+            <Text className='account-copy-label'>账号</Text>
+            <Text className='account-copy-value'>{accountID || '-'}</Text>
+          </View>
+
+          <View
+            className={accountID ? 'copy-btn' : 'copy-btn disabled'}
+            onClick={() => handleCopy('账号', accountID)}
+          >
+            复制
+          </View>
+        </View>
+
+        <View className='account-copy-row'>
+          <View className='account-copy-main'>
+            <Text className='account-copy-label'>协作 ID</Text>
+            <Text className='account-copy-value'>{collaborationID || '-'}</Text>
+          </View>
+
+          <View
+            className={collaborationID ? 'copy-btn' : 'copy-btn disabled'}
+            onClick={() => handleCopy('协作 ID', collaborationID)}
+          >
+            复制
+          </View>
+        </View>
+
         {getMaskedWechatID(user) && (
           <Text className='account-line'>微信标识：{getMaskedWechatID(user)}</Text>
         )}

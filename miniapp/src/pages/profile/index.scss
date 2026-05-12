@@ -20,3 +20,51 @@
   font-size: 24px;
   line-height: 1.5;
 }
+
+.account-copy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid #eef2f7;
+  border-radius: 16px;
+  padding: 18px 20px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.account-copy-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-copy-label {
+  color: #9ca3af;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+.account-copy-value {
+  color: #374151;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #1677ff;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 700;
+  padding: 10px 20px;
+}
+
+.copy-btn.disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+}

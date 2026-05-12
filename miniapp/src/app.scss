@@ -1,14 +1,29 @@
 page {
   min-height: 100vh;
   background-color: #dfe9e8;
-  background-image: url('./assets/miniapp-background.jpg');
-  background-repeat: no-repeat;
-  background-position: center top;
-  background-size: cover;  color: #1f2937;
+  color: #1f2937;
   font-size: 28px;
 }
 
+page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  background-color: #dfe9e8;
+  background-image: url('./assets/miniapp-background.jpg');
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
 .container {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   box-sizing: border-box;
   padding: 24px;
