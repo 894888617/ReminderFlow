@@ -72,6 +72,7 @@ func (r *Repository) FindUserByOpenID(ctx context.Context, openID string) (*Mini
 
 func (r *Repository) UpsertWechatUser(ctx context.Context, params UpsertWechatUserParams) (*MiniUser, error) {
 	var id int64
+	defaultNickname := buildDefaultWechatNickname(params.OpenID)
 
 	err := r.db.QueryRow(ctx, `
 		SELECT id
@@ -88,11 +89,11 @@ func (r *Repository) UpsertWechatUser(ctx context.Context, params UpsertWechatUs
 			SET
 				wechat_openid = $2,
 				wechat_unionid = COALESCE(NULLIF($3, ''), wechat_unionid),
-				nickname = COALESCE(NULLIF($4, ''), nickname),
+				nickname = COALESCE(NULLIF($4, ''), NULLIF(nickname, ''), $6),
 				avatar_url = COALESCE(NULLIF($5, ''), avatar_url),
 				updated_at = NOW()
 			WHERE id = $1
-		`, id, params.OpenID, params.UnionID, params.Nickname, params.AvatarURL)
+		`, id, params.OpenID, params.UnionID, params.Nickname, params.AvatarURL, defaultNickname)
 
 		if updateErr != nil {
 			return nil, updateErr
@@ -118,13 +119,34 @@ func (r *Repository) UpsertWechatUser(ctx context.Context, params UpsertWechatUs
 		)
 		VALUES ($1, NULL, $2, $3, NULLIF($4, ''), NULLIF($5, ''), NULLIF($6, ''), NOW(), NOW())
 		RETURNING id
-	`, username, passwordHash, params.OpenID, params.UnionID, params.Nickname, params.AvatarURL).Scan(&id)
+	`, username, passwordHash, params.OpenID, params.UnionID, coalesceString(params.Nickname, defaultNickname), params.AvatarURL).Scan(&id)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return r.FindUserByOpenID(ctx, params.OpenID)
+}
+
+func buildDefaultWechatNickname(openID string) string {
+	openID = strings.TrimSpace(openID)
+
+	if len(openID) <= 6 {
+		return "微信用户"
+	}
+
+	return "微信用户" + openID[len(openID)-6:]
+}
+
+func coalesceString(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
 }
 
 func buildWechatUsername(openID string) string {

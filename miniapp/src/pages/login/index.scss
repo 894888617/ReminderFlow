@@ -24,18 +24,87 @@
   font-size: 28px;
   line-height: 1.6;
   color: #6b7280;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
+}
+
+.profile-form {
+  margin-bottom: 32px;
+}
+
+.field-label {
+  display: block;
+  color: #374151;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.nickname-input {
+  height: 88px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 18px;
+  box-sizing: border-box;
+  color: #111827;
+  font-size: 30px;
+  padding: 0 24px;
+}
+
+.field-help {
+  display: block;
+  color: #9ca3af;
+  font-size: 23px;
+  line-height: 1.5;
+  margin-top: 14px;
+}
+
+.privacy-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.privacy-checkbox {
+  align-items: center;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #ffffff;
+  display: flex;
+  font-size: 22px;
+  height: 34px;
+  justify-content: center;
+  margin-right: 12px;
+  width: 34px;
+}
+
+.privacy-checkbox-checked {
+  background: #07c160;
+  border-color: #07c160;
+}
+
+.privacy-text,
+.privacy-link {
+  color: #6b7280;
+  font-size: 24px;
+  line-height: 1.6;
+}
+
+.privacy-link {
+  color: #1677ff;
 }
 
 .wechat-btn {
   background: #07c160;
+  border-radius: 18px;
   color: #ffffff;
   font-size: 32px;
   font-weight: 700;
-  border-radius: 18px;
-  padding: 26px 24px;
-  text-align: center;
+  line-height: 1.4;
   margin-bottom: 28px;
+  padding: 22px 24px;
+  text-align: center;
 }
 
 .login-tip {
