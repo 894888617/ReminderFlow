@@ -12,6 +12,7 @@ import { createRecord } from '../../api/record'
 import { canCreateRecord } from '../../utils/permission'
 import { createReminder, type RepeatType } from '../../api/reminder'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 const repeatOptions: { label: string; value: RepeatType }[] = [
@@ -95,7 +96,7 @@ export default function RecordCreatePage() {
   }, [memberOptions, assigneeId])
 
   const loadWorkspaces = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { API_BASE_URL } from './config'
+import { clearLoginSession, getStoredToken } from '../utils/auth'
 
 interface RequestOptions {
   url: string
@@ -10,7 +11,7 @@ interface RequestOptions {
 }
 
 export async function request<T = any>(options: RequestOptions): Promise<T> {
-  const token = Taro.getStorageSync('token')
+  const token = getStoredToken()
 
   const header: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -32,8 +33,7 @@ export async function request<T = any>(options: RequestOptions): Promise<T> {
     const body: any = res.data
 
     if (res.statusCode === 401 || body?.code === 401) {
-      Taro.removeStorageSync('token')
-      Taro.removeStorageSync('user')
+      clearLoginSession()
 
       if (!options.silent) {
         Taro.showToast({

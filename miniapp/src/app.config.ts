@@ -1,8 +1,8 @@
 export default defineAppConfig({
   __usePrivacyCheck__: true,
   pages: [
-    'pages/login/index',
     'pages/home/index',
+    'pages/login/index',
     'pages/todo/index',
     'pages/workspace/index',
     'pages/workspace-create/index',

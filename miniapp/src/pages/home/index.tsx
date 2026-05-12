@@ -3,6 +3,7 @@ import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { getMobileHome, type MobileHomeSummary } from '../../api/home'
 import { getWorkspaces, type Workspace } from '../../api/workspace'
+import { getStoredToken } from '../../utils/auth'
 import { canCreateRecord } from '../../utils/permission'
 import './index.scss'
 
@@ -12,7 +13,7 @@ export default function HomePage() {
   const [workspacesLoaded, setWorkspacesLoaded] = useState(false)
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

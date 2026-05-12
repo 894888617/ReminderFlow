@@ -17,6 +17,7 @@ import {
   canDeleteRecord,
 } from '../../utils/permission'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 function buildDateTime(date: string, time: string) {
@@ -98,7 +99,7 @@ export default function RecordEditPage() {
   }, [memberOptions, assigneeId])
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

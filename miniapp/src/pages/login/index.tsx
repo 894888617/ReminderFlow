@@ -1,15 +1,67 @@
 import { Button, Input, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useState } from 'react'
-import { MiniLoginParams, wechatMiniLogin } from '../../api/auth'
+import { useEffect, useState } from 'react'
+import { getMe, MiniLoginParams, wechatMiniLogin } from '../../api/auth'
+import { getStoredToken, navigateAfterLogin, saveLoginSession } from '../../utils/auth'
 import { openPrivacyContract, requestPrivacyAuthorize } from '../../utils/wechatPrivacy'
 import './index.scss'
 
 const DEFAULT_LOGIN_NAME_TIP = '不填写将使用默认名称'
 
+function getRedirectUrl() {
+  const params = getCurrentInstance().router?.params || {}
+  const redirect = params.redirect ? String(params.redirect) : ''
+
+  if (!redirect) {
+    return ''
+  }
+
+  try {
+    return decodeURIComponent(redirect)
+  } catch (err) {
+    console.error('decode redirect failed', err)
+    return ''
+  }
+}
+
 export default function LoginPage() {
   const [nickname, setNickname] = useState('')
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
+
+  useEffect(() => {
+    let canceled = false
+
+    async function restoreSession() {
+      const token = getStoredToken()
+
+      if (!token) {
+        return
+      }
+
+      try {
+        const user = await getMe({ silent: true })
+
+        if (canceled) {
+          return
+        }
+
+        saveLoginSession({
+          token,
+          user,
+        })
+
+        navigateAfterLogin(getRedirectUrl())
+      } catch (err) {
+        console.error('restore login session failed', err)
+      }
+    }
+
+    restoreSession()
+
+    return () => {
+      canceled = true
+    }
+  }, [])
 
   const handleNicknameInput = (event) => {
     setNickname(String(event.detail?.value || '').slice(0, 32))
@@ -87,28 +139,14 @@ export default function LoginPage() {
 
       const result = await wechatMiniLogin(loginParams)
 
-      Taro.setStorageSync('token', result.token)
-      Taro.setStorageSync('user', result.user)
+      saveLoginSession(result)
 
       Taro.showToast({
         title: '登录成功',
         icon: 'success',
       })
 
-      const params = getCurrentInstance().router?.params || {}
-      const redirect = params.redirect
-        ? decodeURIComponent(String(params.redirect))
-        : ''
-
-      if (redirect) {
-        Taro.redirectTo({
-          url: redirect,
-        })
-      } else {
-        Taro.switchTab({
-          url: '/pages/home/index',
-        })
-      }
+      navigateAfterLogin(getRedirectUrl())
     } catch (err) {
       console.error(err)
     } finally {

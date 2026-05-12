@@ -2,6 +2,7 @@ import { View } from '@tarojs/components'
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { deleteWorkspace, getWorkspaces, type Workspace } from '../../api/workspace'
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 function roleText(role: string) {
@@ -22,7 +23,7 @@ export default function WorkspacePage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

@@ -2,6 +2,7 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { getTodayTodos, type TodayTodoResult, type TodoRecord, type TodoReminder } from '../../api/todo'
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 type TabKey = 'due_today' | 'reminders_today' | 'unfinished'
@@ -33,7 +34,7 @@ export default function TodoPage() {
   const [data, setData] = useState<TodayTodoResult | null>(null)
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

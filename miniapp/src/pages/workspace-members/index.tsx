@@ -15,6 +15,7 @@ import {
   canManageMembers,
 } from '../../utils/permission'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 import PageRefresh from '../../components/PageRefresh'
 import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
@@ -68,7 +69,7 @@ export default function WorkspaceMembersPage() {
   const currentUserId = Number(currentUser?.id || 0)
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({
