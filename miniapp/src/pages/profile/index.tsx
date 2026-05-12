@@ -1,16 +1,17 @@
 import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import { useState } from 'react'
 import { getMe, type MiniUser } from '../../api/auth'
 import { recordSubscription, SUBSCRIBE_SCENE } from '../../api/subscription'
 import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
+import { clearLoginSession, getStoredToken, getStoredUser } from '../../utils/auth'
 import './index.scss'
-import { useState } from 'react'
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<MiniUser | null>(() => Taro.getStorageSync('user') || null)
+  const [user, setUser] = useState<MiniUser | null>(() => getStoredUser() || null)
 
   useDidShow(() => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) return
 
@@ -29,8 +30,7 @@ export default function ProfilePage() {
   const ASSIGNEE_TEMPLATE_ID = '你的负责人变更模板ID'
 
   const handleLogout = () => {
-    Taro.removeStorageSync('token')
-    Taro.removeStorageSync('user')
+    clearLoginSession()
 
     Taro.redirectTo({
       url: '/pages/login/index',

@@ -24,6 +24,7 @@ import {
   type RepeatType,
 } from '../../api/reminder'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 const statusOptions: { label: string; value: RecordStatus }[] = [
@@ -123,7 +124,7 @@ export default function RecordDetailPage() {
   const statusIndex = statusOptions.findIndex((item) => item.value === record?.status)
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

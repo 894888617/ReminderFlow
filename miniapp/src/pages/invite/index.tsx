@@ -9,6 +9,7 @@ import {
 } from '../../api/invite'
 import { getWorkspaces } from '../../api/workspace'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 function roleText(role?: string) {
@@ -93,7 +94,7 @@ export default function InvitePage() {
   }
 
   const handleAccept = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       showLoginPrompt()
@@ -144,7 +145,7 @@ export default function InvitePage() {
       const data = await getInviteDetail(code)
       setInvite(data)
 
-      const token = Taro.getStorageSync('token')
+      const token = getStoredToken()
       if (!token) {
         showLoginPrompt()
         return

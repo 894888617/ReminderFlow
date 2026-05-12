@@ -9,6 +9,7 @@ import {
   type NotificationItem,
 } from '../../api/notification'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 import PageRefresh from "../../components/PageRefresh";
 
@@ -56,7 +57,7 @@ export default function NotificationPage() {
   }, [list])
 
   const loadData = async () => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({

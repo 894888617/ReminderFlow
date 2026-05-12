@@ -31,9 +31,10 @@ export function wechatMiniLogin(data: MiniLoginParams) {
   })
 }
 
-export function getMe() {
+export function getMe(options: { silent?: boolean } = {}) {
   return request<MiniUser>({
     url: '/api/users/me',
     method: 'GET',
+    silent: options.silent,
   })
 }

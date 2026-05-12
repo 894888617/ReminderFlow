@@ -21,6 +21,7 @@ import {
   canViewMembers,
 } from '../../utils/permission'
 
+import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 
 function statusText(status: string) {
@@ -138,7 +139,7 @@ export default function WorkspaceDetailPage() {
   }
 
   const loadData = async (nextKeyword = keyword, nextStatus = status) => {
-    const token = Taro.getStorageSync('token')
+    const token = getStoredToken()
 
     if (!token) {
       Taro.redirectTo({
