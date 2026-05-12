@@ -27,3 +27,5 @@ declare namespace NodeJS {
 }
 
 
+
+declare function requirePlugin(name: string): any;
