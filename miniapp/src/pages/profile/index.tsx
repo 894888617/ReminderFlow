@@ -3,7 +3,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { getMe, type MiniUser } from '../../api/auth'
 import { recordSubscription, SUBSCRIBE_SCENE } from '../../api/subscription'
-import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
+import { getWechatDisplayName } from '../../utils/userDisplay'
 import { clearLoginSession, getStoredToken, getStoredUser } from '../../utils/auth'
 import './index.scss'
 
@@ -38,8 +38,6 @@ export default function ProfilePage() {
   }
 
   const accountID = user?.username || ''
-  const collaborationID = getCollaborationID(user)
-
   const handleCopy = (label: string, value?: string) => {
     if (!value) {
       Taro.showToast({
@@ -151,23 +149,6 @@ export default function ProfilePage() {
           </View>
         </View>
 
-        <View className='account-copy-row'>
-          <View className='account-copy-main'>
-            <Text className='account-copy-label'>协作 ID</Text>
-            <Text className='account-copy-value'>{collaborationID || '-'}</Text>
-          </View>
-
-          <View
-            className={collaborationID ? 'copy-btn' : 'copy-btn disabled'}
-            onClick={() => handleCopy('协作 ID', collaborationID)}
-          >
-            复制
-          </View>
-        </View>
-
-        {getMaskedWechatID(user) && (
-          <Text className='account-line'>微信标识：{getMaskedWechatID(user)}</Text>
-        )}
       </View>
 
       <View className='secondary-btn' onClick={handleSubscribeMessage}>

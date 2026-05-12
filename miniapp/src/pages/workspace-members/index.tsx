@@ -18,7 +18,7 @@ import {
 import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 import PageRefresh from '../../components/PageRefresh'
-import { getCollaborationID, getMaskedWechatID, getWechatDisplayName } from '../../utils/userDisplay'
+import { getWechatDisplayName } from '../../utils/userDisplay'
 
 const roleOptions: { label: string; value: 'member' | 'viewer' }[] = [
   { label: '成员', value: 'member' },
@@ -159,7 +159,7 @@ export default function WorkspaceMembersPage() {
 
     if (!keyword) {
       Taro.showToast({
-        title: '请输入成员协作 ID',
+        title: '请输入成员账号',
         icon: 'none',
       })
       return
@@ -263,14 +263,14 @@ export default function WorkspaceMembersPage() {
 
       {manageable && (
         <View className='add-member-card'>
-          <View className='add-member-title'>通过协作 ID 添加成员</View>
-          <View className='add-member-desc'>让对方在“我的”页面复制协作 ID（如 U000123），即可准确添加同一个微信登录账号。</View>
+          <View className='add-member-title'>通过账号添加成员</View>
+          <View className='add-member-desc'>让对方在“我的”页面复制账号，即可准确添加成员。</View>
 
           <View className='add-member-row'>
             <Input
               className='add-member-input'
               value={memberKeyword}
-              placeholder='输入协作 ID / 用户 ID / 账号'
+              placeholder='输入账号'
               confirmType='done'
               onInput={(e) => setMemberKeyword(e.detail.value)}
               onConfirm={handleAddMember}
@@ -313,13 +313,6 @@ export default function WorkspaceMembersPage() {
             <View key={item.id} className='member-card'>
               <View className='member-main'>
                 <View className='member-name'>{getWechatDisplayName(item)}</View>
-                <View className='member-meta'>协作 ID：{getCollaborationID(item) || '-'}</View>
-                {item.nickname && item.username && item.nickname !== item.username && (
-                  <View className='member-meta'>账号：{item.username}</View>
-                )}
-                {getMaskedWechatID(item) && (
-                  <View className='member-meta'>微信标识：{getMaskedWechatID(item)}</View>
-                )}
                 <View className='member-meta'>
                   加入时间：{formatDateTime(item.created_at)}
                 </View>
