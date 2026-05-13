@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -259,6 +260,34 @@ func (r *Repository) AcceptInvite(ctx context.Context, code string, userID int64
 	}
 
 	return &AcceptResult{CalendarID: invite.CalendarID, CalendarName: invite.CalendarName, Role: invite.Role}, nil
+}
+
+func (r *Repository) CreateNotification(ctx context.Context, calendarID, userID int64, notificationType, title, content string) error {
+	if userID <= 0 {
+		log.Printf("warning: skip notification with invalid user_id=%d", userID)
+		return nil
+	}
+
+	tag, err := r.db.Exec(ctx, `
+		INSERT INTO notifications (
+			calendar_id,
+			user_id,
+			notification_type,
+			title,
+			content,
+			read,
+			created_at
+		)
+		SELECT NULLIF($1, 0), $2, $3, $4, $5, false, NOW()
+		WHERE EXISTS (SELECT 1 FROM users WHERE id = $2)
+	`, calendarID, userID, notificationType, title, content)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		log.Printf("warning: skip notification for missing user_id=%d calendar_id=%d", userID, calendarID)
+	}
+	return nil
 }
 
 func IsNotFound(err error) bool {

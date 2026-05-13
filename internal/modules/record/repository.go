@@ -3,6 +3,7 @@ package record
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -46,6 +47,7 @@ type CreateRecordParams struct {
 	CalendarStartAt *time.Time
 	CalendarEndAt   *time.Time
 	CalendarAllDay  bool
+	RemindAt        *time.Time
 }
 
 func (r *Repository) GetCalendarMemberRole(ctx context.Context, calendarID, userID int64) (string, error) {
@@ -82,6 +84,10 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	if params.CalendarID <= 0 {
 		params.CalendarID = params.WorkspaceID
 	}
+	var legacyWorkspaceID *int64
+	if params.WorkspaceID > 0 {
+		legacyWorkspaceID = &params.WorkspaceID
+	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -104,7 +110,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7)
 		RETURNING
 			id,
-			workspace_id,
+			COALESCE(workspace_id, calendar_id, 0),
 			COALESCE(calendar_id, 0),
 			title,
 			COALESCE(content, ''),
@@ -115,7 +121,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			created_at,
 			updated_at
 	`,
-		params.WorkspaceID,
+		legacyWorkspaceID,
 		params.CalendarID,
 		params.Title,
 		params.Content,
@@ -137,6 +143,22 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if params.RemindAt != nil {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO reminders (
+				calendar_id,
+				record_id,
+				remind_at,
+				repeat_type,
+				notified
+			)
+			VALUES ($1, $2, $3, 'NONE', false)
+		`, params.CalendarID, rec.ID, params.RemindAt)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if params.CalendarStartAt != nil {
@@ -225,7 +247,7 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 	querySQL := fmt.Sprintf(`
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			COALESCE(rec.workspace_id, rec.calendar_id, 0),
 			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
@@ -319,7 +341,7 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 	err := r.db.QueryRow(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			COALESCE(rec.workspace_id, rec.calendar_id, 0),
 			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
@@ -361,7 +383,7 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 	err := r.db.QueryRow(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			COALESCE(rec.workspace_id, rec.calendar_id, 0),
 			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
@@ -505,7 +527,7 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			COALESCE(rec.workspace_id, rec.calendar_id, 0),
 			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
@@ -675,23 +697,37 @@ func (r *Repository) UpdateAssignee(ctx context.Context, recordID int64, assigne
 	return r.FindByID(ctx, id)
 }
 
-func (r *Repository) CreateNotification(ctx context.Context, userID int64, recordID int64, title, content string) error {
-	_, err := r.db.Exec(ctx, `
+func (r *Repository) CreateNotification(ctx context.Context, userID int64, recordID int64, notificationType, title, content string) error {
+	if userID <= 0 {
+		log.Printf("warning: skip notification with invalid user_id=%d", userID)
+		return nil
+	}
+
+	tag, err := r.db.Exec(ctx, `
 		INSERT INTO notifications (
 			calendar_id,
 			user_id,
 			record_id,
+			notification_type,
 			title,
 			content,
 			read,
 			created_at
 		)
-		SELECT rec.calendar_id, $1, $2, $3, $4, false, NOW()
+		SELECT rec.calendar_id, $1, $2, $3, $4, $5, false, NOW()
 		FROM records rec
 		WHERE rec.id = $2
-	`, userID, recordID, title, content)
+		  AND EXISTS (SELECT 1 FROM users WHERE id = $1)
+	`, userID, recordID, notificationType, title, content)
+	if err != nil {
+		return err
+	}
 
-	return err
+	if tag.RowsAffected() == 0 {
+		log.Printf("warning: skip notification for missing user_id=%d record_id=%d", userID, recordID)
+	}
+
+	return nil
 }
 
 type ListRecordsParams struct {
@@ -714,9 +750,11 @@ type PageResult struct {
 }
 
 type BasicRecordInfo struct {
-	ID         int64
-	Title      string
-	AssigneeID int64
+	ID           int64
+	CalendarID   int64
+	CalendarName string
+	Title        string
+	AssigneeID   int64
 }
 
 func (r *Repository) GetBasicInfo(ctx context.Context, id int64) (*BasicRecordInfo, error) {
@@ -724,13 +762,18 @@ func (r *Repository) GetBasicInfo(ctx context.Context, id int64) (*BasicRecordIn
 
 	err := r.db.QueryRow(ctx, `
 		SELECT
-			id,
-			title,
-			COALESCE(assignee_id, 0)
-		FROM records
-		WHERE id = $1
+			rec.id,
+			rec.calendar_id,
+			COALESCE(c.name, ''),
+			rec.title,
+			COALESCE(rec.assignee_id, 0)
+		FROM records rec
+		LEFT JOIN calendars c ON c.id = rec.calendar_id
+		WHERE rec.id = $1
 	`, id).Scan(
 		&item.ID,
+		&item.CalendarID,
+		&item.CalendarName,
 		&item.Title,
 		&item.AssigneeID,
 	)

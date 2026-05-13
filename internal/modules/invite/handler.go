@@ -2,6 +2,7 @@ package invite
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -190,6 +191,30 @@ func (h *Handler) Accept(c *gin.Context) {
 			response.Internal(c, "accept invite failed")
 		}
 		return
+	}
+
+	if !result.AlreadyJoined {
+		if err := h.repo.CreateNotification(
+			c.Request.Context(),
+			result.CalendarID,
+			currentUserID,
+			"INVITE_ACCEPTED",
+			"已加入日历",
+			"你已加入日历："+result.CalendarName,
+		); err != nil {
+			log.Println("create invite accepted notification failed:", err)
+		}
+
+		if err := h.repo.CreateNotification(
+			c.Request.Context(),
+			invite.CalendarID,
+			invite.InviterID,
+			"INVITE_JOINED",
+			"成员加入日历",
+			"有新成员通过邀请加入日历："+invite.CalendarName,
+		); err != nil {
+			log.Println("create invite joined notification failed:", err)
+		}
 	}
 
 	response.OK(c, AcceptInviteResponse{CalendarID: result.CalendarID})

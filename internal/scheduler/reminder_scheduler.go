@@ -53,16 +53,18 @@ type DueReminder struct {
 	RecordID     int64
 	RecordTitle  string
 	CalendarID   int64
+	CalendarName string
 	NotifyUserID int64
 	RemindAt     time.Time
 	RepeatType   string
 }
 
 type pendingReminderPush struct {
-	UserID      int64
-	RecordID    int64
-	RecordTitle string
-	RemindAt    time.Time
+	UserID       int64
+	RecordID     int64
+	CalendarName string
+	RecordTitle  string
+	RemindAt     time.Time
 }
 
 func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
@@ -78,11 +80,13 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			rm.record_id,
 			rec.title,
 			rec.calendar_id,
+			COALESCE(c.name, ''),
 			COALESCE(rec.assignee_id, rec.creator_id),
 			rm.remind_at,
 			rm.repeat_type
 		FROM reminders rm
 		INNER JOIN records rec ON rec.id = rm.record_id
+		LEFT JOIN calendars c ON c.id = rec.calendar_id
 		WHERE rm.notified = false 
 		  AND rm.remind_at <= NOW()
 		  AND rec.status NOT IN ('DONE', 'CANCELLED')
@@ -106,6 +110,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			&item.RecordID,
 			&item.RecordTitle,
 			&item.CalendarID,
+			&item.CalendarName,
 			&item.NotifyUserID,
 			&item.RemindAt,
 			&item.RepeatType,
@@ -129,22 +134,27 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		title := "任务提醒"
 		content := fmt.Sprintf("记录「%s」已到提醒时间，请及时处理。", item.RecordTitle)
 
-		_, err = tx.Exec(ctx, `
+		tag, err := tx.Exec(ctx, `
 			INSERT INTO notifications (
 				calendar_id,
 				user_id,
 				record_id,
+				notification_type,
 				title,
 				content,
 				read,
 				created_at
 			)
-			VALUES ($1, $2, $3, $4, $5, false, NOW())
-		`, item.CalendarID, item.NotifyUserID, item.RecordID, title, content)
+			SELECT NULLIF($1, 0), $2, $3, $4, $5, $6, false, NOW()
+			WHERE EXISTS (SELECT 1 FROM users WHERE id = $2)
+		`, item.CalendarID, item.NotifyUserID, item.RecordID, "TASK_REMINDER", title, content)
 
 		if err != nil {
 			log.Println("create reminder notification failed:", err)
 			return err
+		}
+		if tag.RowsAffected() == 0 {
+			log.Printf("warning: skip reminder notification for missing user_id=%d record_id=%d", item.NotifyUserID, item.RecordID)
 		}
 
 		if item.RepeatType == "NONE" {
@@ -169,10 +179,11 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		}
 
 		pendingPushes = append(pendingPushes, pendingReminderPush{
-			UserID:      item.NotifyUserID,
-			RecordID:    item.RecordID,
-			RecordTitle: item.RecordTitle,
-			RemindAt:    item.RemindAt,
+			UserID:       item.NotifyUserID,
+			RecordID:     item.RecordID,
+			CalendarName: item.CalendarName,
+			RecordTitle:  item.RecordTitle,
+			RemindAt:     item.RemindAt,
 		})
 	}
 
@@ -186,10 +197,11 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		}
 
 		err := s.subscriptionService.SendTaskReminder(ctx, subscription.SendTaskReminderParams{
-			UserID:      item.UserID,
-			RecordID:    item.RecordID,
-			RecordTitle: item.RecordTitle,
-			RemindTime:  item.RemindAt.Format("2006-01-02 15:04"),
+			UserID:       item.UserID,
+			RecordID:     item.RecordID,
+			CalendarName: item.CalendarName,
+			RecordTitle:  item.RecordTitle,
+			RemindAt:     item.RemindAt.Format("2006-01-02 15:04"),
 		})
 		if err != nil {
 			log.Println("send wechat task reminder failed:", err)
