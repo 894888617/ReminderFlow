@@ -12,6 +12,10 @@ export function getUserNumericID(user?: WechatUserDisplayFields | null) {
 }
 
 export function getCollaborationID(user?: WechatUserDisplayFields | null) {
+  const username = user?.username?.trim()
+
+  if (username && isGeneratedWechatUsername(username)) return username
+
   const id = getUserNumericID(user)
 
   if (!id) return ''
