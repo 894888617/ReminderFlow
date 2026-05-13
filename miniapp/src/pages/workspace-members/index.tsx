@@ -19,6 +19,7 @@ import { getStoredToken } from '../../utils/auth'
 import './index.scss'
 import PageRefresh from '../../components/PageRefresh'
 import { getWechatDisplayName } from '../../utils/userDisplay'
+import { readTextFromClipboard } from '../../utils/clipboard'
 
 const roleOptions: { label: string; value: 'member' | 'viewer' }[] = [
   { label: '成员', value: 'member' },
@@ -156,8 +157,7 @@ export default function WorkspaceMembersPage() {
     if (!manageable) return
 
     try {
-      const res = await Taro.getClipboardData()
-      const keyword = String(res.data || '').trim()
+      const keyword = await readTextFromClipboard()
 
       if (!keyword) {
         Taro.showToast({
