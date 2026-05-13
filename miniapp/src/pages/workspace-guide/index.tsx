@@ -2,7 +2,7 @@ import { View, Text, Button } from '@tarojs/components'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { useState } from 'react'
 
-import { createWorkspaceInvite } from '../../api/invite'
+import { createCalendarInvite } from '../../api/invite'
 
 import './index.scss'
 
@@ -18,7 +18,7 @@ export default function WorkspaceGuidePage() {
 
   useShareAppMessage(() => {
     return {
-      title: `邀请你加入「${workspaceName || '协作空间'}」`,
+      title: `邀请加入日历「${workspaceName || '共享日历'}」`,
       path: invitePath || `/pages/workspace/index`,
     }
   })
@@ -63,14 +63,14 @@ export default function WorkspaceGuidePage() {
         mask: true,
       })
 
-      const res = await createWorkspaceInvite(workspaceId, {
+      const res = await createCalendarInvite(workspaceId, {
         role: 'member',
-        expire_hours: 24 * 7,
-        max_use_count: 20,
+        expire_days: 7,
+        max_uses: 20,
       })
 
-      setInvitePath(res.path)
-      setInviteCode(res.invite_code)
+      setInvitePath(res.share_path)
+      setInviteCode(res.code)
 
       Taro.hideLoading()
 
@@ -127,7 +127,7 @@ export default function WorkspaceGuidePage() {
         <Text className='guide-title'>空间创建成功</Text>
         <Text className='guide-name'>{workspaceName || '新的协作空间'}</Text>
         <Text className='guide-desc'>
-          接下来可以创建第一条记录、邀请成员协作，或者开启提醒通知。
+          接下来可以创建第一条记录、邀请加入日历，或者开启提醒通知。
         </Text>
       </View>
 
@@ -150,9 +150,9 @@ export default function WorkspaceGuidePage() {
         <View className='step-index green'>2</View>
 
         <View className='step-content'>
-          <Text className='step-title'>邀请成员加入</Text>
+          <Text className='step-title'>邀请加入日历</Text>
           <Text className='step-desc'>
-            生成邀请链接后，可以通过微信分享给好友或团队成员。
+            生成邀请链接后，好友接受邀请即可加入日历。
           </Text>
         </View>
 
@@ -165,7 +165,7 @@ export default function WorkspaceGuidePage() {
           </View>
         ) : (
           <Button className='share-btn' openType='share'>
-            分享邀请
+            分享邀请加入日历
           </Button>
         )}
       </View>

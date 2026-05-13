@@ -13,6 +13,7 @@ export default defineAppConfig({
     'pages/record-detail/index',
     'pages/record-edit/index',
     'pages/notification/index',
+    'pages/invite-accept/index',
     'pages/invite/index',
     'pages/profile/index',
   ],
