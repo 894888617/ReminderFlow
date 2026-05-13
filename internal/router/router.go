@@ -126,11 +126,15 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.GET("/calendars/:calendar_id", calendarHandler.Detail)
 			authGroup.PUT("/calendars/:calendar_id", calendarHandler.Update)
 			authGroup.DELETE("/calendars/:calendar_id", calendarHandler.Delete)
+			authGroup.GET("/calendars/:calendar_id/events", calendarHandler.ListEvents)
 
 			authGroup.GET("/calendars/:calendar_id/members", calendarHandler.ListMembers)
 			authGroup.POST("/calendars/:calendar_id/invites", inviteHandler.Create)
 			authGroup.PUT("/calendars/:calendar_id/members/:user_id/role", calendarHandler.UpdateMemberRole)
 			authGroup.DELETE("/calendars/:calendar_id/members/:user_id", calendarHandler.RemoveMember)
+
+			authGroup.PUT("/calendar-events/:event_id/time", calendarHandler.UpdateEventTime)
+			authGroup.DELETE("/calendar-events/:event_id", calendarHandler.DeleteEvent)
 
 			authGroup.POST("/records", recordHandler.Create)
 			authGroup.GET("/records", recordHandler.List)

@@ -31,11 +31,15 @@ func NewHandler(
 }
 
 type CreateRecordRequest struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	Title       string `json:"title"`
-	Content     string `json:"content"`
-	AssigneeID  *int64 `json:"assignee_id"`
-	DueAt       string `json:"due_at"`
+	WorkspaceID     int64   `json:"workspace_id"`
+	CalendarID      int64   `json:"calendar_id"`
+	Title           string  `json:"title"`
+	Content         string  `json:"content"`
+	AssigneeID      *int64  `json:"assignee_id"`
+	DueAt           string  `json:"due_at"`
+	CalendarStartAt string  `json:"calendar_start_at"`
+	CalendarEndAt   *string `json:"calendar_end_at"`
+	CalendarAllDay  *bool   `json:"calendar_all_day"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -106,13 +110,50 @@ func (h *Handler) Create(c *gin.Context) {
 		dueAt = &parsed
 	}
 
+	var calendarStartAt *time.Time
+	if strings.TrimSpace(req.CalendarStartAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, req.CalendarStartAt)
+		if err != nil {
+			response.BadRequest(c, "invalid calendar_start_at format, use RFC3339")
+			return
+		}
+		calendarStartAt = &parsed
+	}
+
+	var calendarEndAt *time.Time
+	if req.CalendarEndAt != nil && strings.TrimSpace(*req.CalendarEndAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.CalendarEndAt))
+		if err != nil {
+			response.BadRequest(c, "invalid calendar_end_at format, use RFC3339")
+			return
+		}
+		if calendarStartAt != nil && parsed.Before(*calendarStartAt) {
+			response.BadRequest(c, "calendar_end_at must not be before calendar_start_at")
+			return
+		}
+		calendarEndAt = &parsed
+	}
+
+	calendarID := req.CalendarID
+	if calendarID <= 0 {
+		calendarID = req.WorkspaceID
+	}
+	calendarAllDay := true
+	if req.CalendarAllDay != nil {
+		calendarAllDay = *req.CalendarAllDay
+	}
+
 	rec, err := h.repo.Create(c.Request.Context(), CreateRecordParams{
-		WorkspaceID: req.WorkspaceID,
-		Title:       req.Title,
-		Content:     req.Content,
-		CreatorID:   currentUserID,
-		AssigneeID:  req.AssigneeID,
-		DueAt:       dueAt,
+		WorkspaceID:     req.WorkspaceID,
+		CalendarID:      calendarID,
+		Title:           req.Title,
+		Content:         req.Content,
+		CreatorID:       currentUserID,
+		AssigneeID:      req.AssigneeID,
+		DueAt:           dueAt,
+		CalendarStartAt: calendarStartAt,
+		CalendarEndAt:   calendarEndAt,
+		CalendarAllDay:  calendarAllDay,
 	})
 
 	if err != nil {

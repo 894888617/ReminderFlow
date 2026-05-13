@@ -22,6 +22,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 type Record struct {
 	ID              int64      `json:"id"`
 	WorkspaceID     int64      `json:"workspace_id"`
+	CalendarID      int64      `json:"calendar_id"`
 	Title           string     `json:"title"`
 	Content         string     `json:"content"`
 	CreatorID       int64      `json:"creator_id"`
@@ -35,12 +36,16 @@ type Record struct {
 }
 
 type CreateRecordParams struct {
-	WorkspaceID int64
-	Title       string
-	Content     string
-	CreatorID   int64
-	AssigneeID  *int64
-	DueAt       *time.Time
+	WorkspaceID     int64
+	CalendarID      int64
+	Title           string
+	Content         string
+	CreatorID       int64
+	AssigneeID      *int64
+	DueAt           *time.Time
+	CalendarStartAt *time.Time
+	CalendarEndAt   *time.Time
+	CalendarAllDay  bool
 }
 
 func (r *Repository) GetWorkspaceMemberRole(ctx context.Context, workspaceID, userID int64) (string, error) {
@@ -72,11 +77,21 @@ func (r *Repository) IsWorkspaceMember(ctx context.Context, workspaceID, userID 
 }
 
 func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Record, error) {
-	var rec Record
+	if params.CalendarID <= 0 {
+		params.CalendarID = params.WorkspaceID
+	}
 
-	err := r.db.QueryRow(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var rec Record
+	err = tx.QueryRow(ctx, `
 		INSERT INTO records (
 			workspace_id,
+			calendar_id,
 			title,
 			content,
 			creator_id,
@@ -84,10 +99,11 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			status,
 			due_at
 		)
-		VALUES ($1, $2, $3, $4, $5, 'PENDING', $6)
+		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7)
 		RETURNING
 			id,
 			workspace_id,
+			COALESCE(calendar_id, 0),
 			title,
 			COALESCE(content, ''),
 			creator_id,
@@ -98,6 +114,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			updated_at
 	`,
 		params.WorkspaceID,
+		params.CalendarID,
 		params.Title,
 		params.Content,
 		params.CreatorID,
@@ -106,6 +123,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	).Scan(
 		&rec.ID,
 		&rec.WorkspaceID,
+		&rec.CalendarID,
 		&rec.Title,
 		&rec.Content,
 		&rec.CreatorID,
@@ -115,8 +133,31 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
 	)
-
 	if err != nil {
+		return nil, err
+	}
+
+	if params.CalendarStartAt != nil {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO calendar_events (
+				calendar_id,
+				record_id,
+				title,
+				start_at,
+				end_at,
+				all_day,
+				timezone,
+				status,
+				created_by
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', 'active', $7)
+		`, params.CalendarID, rec.ID, rec.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.CreatorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -171,6 +212,7 @@ func (r *Repository) ListByWorkspace(ctx context.Context, params ListRecordsPara
 		SELECT
 			rec.id,
 			rec.workspace_id,
+			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -214,6 +256,7 @@ func (r *Repository) ListByWorkspace(ctx context.Context, params ListRecordsPara
 		if err := rows.Scan(
 			&rec.ID,
 			&rec.WorkspaceID,
+			&rec.CalendarID,
 			&rec.Title,
 			&rec.Content,
 			&rec.CreatorID,
@@ -263,6 +306,7 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 		SELECT
 			rec.id,
 			rec.workspace_id,
+			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -278,6 +322,7 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 	`, id).Scan(
 		&rec.ID,
 		&rec.WorkspaceID,
+		&rec.CalendarID,
 		&rec.Title,
 		&rec.Content,
 		&rec.CreatorID,
@@ -303,6 +348,7 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 		SELECT
 			rec.id,
 			rec.workspace_id,
+			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -322,6 +368,7 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 	`, recordID, userID).Scan(
 		&item.ID,
 		&item.WorkspaceID,
+		&item.CalendarID,
 		&item.Title,
 		&item.Content,
 		&item.CreatorID,
@@ -444,6 +491,7 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 		SELECT
 			rec.id,
 			rec.workspace_id,
+			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -476,6 +524,7 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 		if err := rows.Scan(
 			&rec.ID,
 			&rec.WorkspaceID,
+			&rec.CalendarID,
 			&rec.Title,
 			&rec.Content,
 			&rec.CreatorID,
