@@ -1,6 +1,8 @@
 package invite
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +13,14 @@ import (
 	"reminder-flow/pkg/response"
 )
 
+const (
+	RoleOwner  = "owner"
+	RoleMember = "member"
+	RoleViewer = "viewer"
+)
+
+var ErrInviteExpired = errors.New("invite expired")
+
 type Handler struct {
 	repo *Repository
 }
@@ -20,34 +30,43 @@ func NewHandler(repo *Repository) *Handler {
 }
 
 type CreateInviteRequest struct {
-	Role        string `json:"role"`
-	ExpireHours int    `json:"expire_hours"`
-	MaxUseCount *int   `json:"max_use_count"`
+	Role       string `json:"role"`
+	ExpireDays int    `json:"expire_days"`
+	MaxUses    int    `json:"max_uses"`
 }
 
 type CreateInviteResponse struct {
-	InviteCode string           `json:"invite_code"`
-	Path       string           `json:"path"`
-	Invite     *WorkspaceInvite `json:"invite"`
+	Code         string    `json:"code"`
+	CalendarID   int64     `json:"calendar_id"`
+	CalendarName string    `json:"calendar_name"`
+	Role         string    `json:"role"`
+	ExpireAt     time.Time `json:"expire_at"`
+	SharePath    string    `json:"share_path"`
+}
+
+type InviteDetailResponse struct {
+	Code         string `json:"code"`
+	CalendarID   int64  `json:"calendar_id"`
+	CalendarName string `json:"calendar_name"`
+	InviterName  string `json:"inviter_name"`
+	Role         string `json:"role"`
+	Expired      bool   `json:"expired"`
+	Accepted     bool   `json:"accepted"`
 }
 
 type AcceptInviteResponse struct {
-	WorkspaceID   int64  `json:"workspace_id"`
-	WorkspaceName string `json:"workspace_name"`
-	Role          string `json:"role"`
-	Message       string `json:"message"`
+	CalendarID int64 `json:"calendar_id"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	currentUserID, ok := middleware.GetCurrentUserID(c)
 	if !ok {
-		response.Unauthorized(c, "unauthorized")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
-	workspaceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || workspaceID <= 0 {
-		response.BadRequest(c, "invalid workspace id")
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
 		return
 	}
 
@@ -57,35 +76,35 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	req.Role = strings.TrimSpace(req.Role)
+	req.Role = strings.ToLower(strings.TrimSpace(req.Role))
 	if req.Role == "" {
-		req.Role = "member"
+		req.Role = RoleMember
 	}
-
-	if req.Role != "member" && req.Role != "viewer" {
+	if req.Role != RoleMember && req.Role != RoleViewer {
 		response.BadRequest(c, "invalid role")
 		return
 	}
+	if req.ExpireDays <= 0 {
+		req.ExpireDays = 7
+	}
+	if req.MaxUses <= 0 {
+		req.MaxUses = 1
+	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), workspaceID, currentUserID)
-	if err != nil || currentRole != "owner" {
-		response.Forbidden(c, "only owner can create invite")
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), calendarID, currentUserID)
+	if err != nil || (currentRole != RoleOwner && currentRole != RoleMember) {
+		response.Forbidden(c, "无权限创建邀请")
 		return
 	}
 
-	var expireAt *time.Time
-	if req.ExpireHours > 0 {
-		t := time.Now().Add(time.Duration(req.ExpireHours) * time.Hour)
-		expireAt = &t
-	}
-
+	expireAt := time.Now().AddDate(0, 0, req.ExpireDays)
 	invite, err := h.repo.CreateInvite(
 		c.Request.Context(),
-		workspaceID,
+		calendarID,
 		currentUserID,
 		req.Role,
 		expireAt,
-		req.MaxUseCount,
+		req.MaxUses,
 	)
 	if err != nil {
 		response.Internal(c, "create invite failed")
@@ -93,9 +112,12 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	response.OK(c, CreateInviteResponse{
-		InviteCode: invite.InviteCode,
-		Path:       "/pages/invite/index?code=" + invite.InviteCode,
-		Invite:     invite,
+		Code:         invite.Code,
+		CalendarID:   invite.CalendarID,
+		CalendarName: invite.CalendarName,
+		Role:         invite.Role,
+		ExpireAt:     invite.ExpireAt,
+		SharePath:    "/pages/invite-accept/index?code=" + invite.Code,
 	})
 }
 
@@ -108,27 +130,29 @@ func (h *Handler) Detail(c *gin.Context) {
 
 	invite, err := h.repo.GetInviteByCode(c.Request.Context(), code)
 	if err != nil {
-		response.BadRequest(c, "invite not found")
+		if IsNotFound(err) {
+			response.NotFound(c, "邀请不存在")
+			return
+		}
+		response.Internal(c, "get invite failed")
 		return
 	}
 
-	if invite.ExpireAt != nil && invite.ExpireAt.Before(time.Now()) {
-		response.BadRequest(c, "invite expired")
-		return
-	}
-
-	if invite.MaxUseCount != nil && invite.UsedCount >= *invite.MaxUseCount {
-		response.BadRequest(c, "invite usage limit reached")
-		return
-	}
-
-	response.OK(c, invite)
+	response.OK(c, InviteDetailResponse{
+		Code:         invite.Code,
+		CalendarID:   invite.CalendarID,
+		CalendarName: invite.CalendarName,
+		InviterName:  invite.InviterName,
+		Role:         invite.Role,
+		Expired:      invite.ExpireAt.Before(time.Now()),
+		Accepted:     invite.MaxUses > 0 && invite.UsedCount >= invite.MaxUses,
+	})
 }
 
 func (h *Handler) Accept(c *gin.Context) {
 	currentUserID, ok := middleware.GetCurrentUserID(c)
 	if !ok {
-		response.Unauthorized(c, "unauthorized")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
@@ -140,51 +164,42 @@ func (h *Handler) Accept(c *gin.Context) {
 
 	invite, err := h.repo.GetInviteByCode(c.Request.Context(), code)
 	if err != nil {
-		response.BadRequest(c, "invite not found")
-		return
-	}
-
-	if invite.ExpireAt != nil && invite.ExpireAt.Before(time.Now()) {
-		response.BadRequest(c, "invite expired")
-		return
-	}
-
-	if invite.MaxUseCount != nil && invite.UsedCount >= *invite.MaxUseCount {
-		response.BadRequest(c, "invite usage limit reached")
-		return
-	}
-
-	exists, err := h.repo.IsWorkspaceMember(c.Request.Context(), invite.WorkspaceID, currentUserID)
-	if err != nil {
-		response.Internal(c, "check member failed")
-		return
-	}
-
-	if exists {
-		currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), invite.WorkspaceID, currentUserID)
-		if err != nil {
-			response.Internal(c, "get member role failed")
+		if IsNotFound(err) {
+			response.NotFound(c, "邀请不存在")
 			return
 		}
-
-		response.OK(c, AcceptInviteResponse{
-			WorkspaceID:   invite.WorkspaceID,
-			WorkspaceName: invite.WorkspaceName,
-			Role:          currentRole,
-			Message:       "already joined",
-		})
+		response.Internal(c, "get invite failed")
 		return
 	}
 
-	if err := h.repo.AcceptInvite(c.Request.Context(), invite, currentUserID); err != nil {
-		response.Internal(c, "accept invite failed")
+	if invite.ExpireAt.Before(time.Now()) {
+		response.Fail(c, http.StatusGone, 41000, "邀请已过期")
 		return
 	}
 
-	response.OK(c, AcceptInviteResponse{
-		WorkspaceID:   invite.WorkspaceID,
-		WorkspaceName: invite.WorkspaceName,
-		Role:          invite.Role,
-		Message:       "joined",
-	})
+	result, err := h.repo.AcceptInvite(c.Request.Context(), code, currentUserID)
+	if err != nil {
+		switch {
+		case IsNotFound(err):
+			response.NotFound(c, "邀请不存在")
+		case errors.Is(err, ErrInviteExpired):
+			response.Fail(c, http.StatusGone, 41000, "邀请已过期")
+		case errors.Is(err, ErrInviteLimitReached):
+			response.Fail(c, http.StatusConflict, 40900, "邀请次数已用完")
+		default:
+			response.Internal(c, "accept invite failed")
+		}
+		return
+	}
+
+	response.OK(c, AcceptInviteResponse{CalendarID: result.CalendarID})
+}
+
+func parseCalendarID(c *gin.Context) (int64, bool) {
+	calendarID, err := strconv.ParseInt(c.Param("calendar_id"), 10, 64)
+	if err != nil || calendarID <= 0 {
+		response.BadRequest(c, "invalid calendar id")
+		return 0, false
+	}
+	return calendarID, true
 }

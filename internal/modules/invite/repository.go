@@ -4,10 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrInviteLimitReached = errors.New("invite usage limit reached")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -17,18 +21,25 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-type WorkspaceInvite struct {
-	ID            int64      `json:"id"`
-	WorkspaceID   int64      `json:"workspace_id"`
-	WorkspaceName string     `json:"workspace_name"`
-	InviterID     int64      `json:"inviter_id"`
-	InviterName   string     `json:"inviter_name"`
-	InviteCode    string     `json:"invite_code"`
-	Role          string     `json:"role"`
-	ExpireAt      *time.Time `json:"expire_at"`
-	UsedCount     int        `json:"used_count"`
-	MaxUseCount   *int       `json:"max_use_count"`
-	CreatedAt     time.Time  `json:"created_at"`
+type CalendarInvite struct {
+	ID           int64     `json:"id"`
+	CalendarID   int64     `json:"calendar_id"`
+	CalendarName string    `json:"calendar_name"`
+	InviterID    int64     `json:"inviter_id"`
+	InviterName  string    `json:"inviter_name"`
+	Code         string    `json:"code"`
+	Role         string    `json:"role"`
+	ExpireAt     time.Time `json:"expire_at"`
+	UsedCount    int       `json:"used_count"`
+	MaxUses      int       `json:"max_uses"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type AcceptResult struct {
+	CalendarID    int64
+	CalendarName  string
+	Role          string
+	AlreadyJoined bool
 }
 
 func GenerateInviteCode() (string, error) {
@@ -42,52 +53,31 @@ func GenerateInviteCode() (string, error) {
 
 func (r *Repository) CreateInvite(
 	ctx context.Context,
-	workspaceID int64,
+	calendarID int64,
 	inviterID int64,
 	role string,
-	expireAt *time.Time,
-	maxUseCount *int,
-) (*WorkspaceInvite, error) {
+	expireAt time.Time,
+	maxUses int,
+) (*CalendarInvite, error) {
 	code, err := GenerateInviteCode()
 	if err != nil {
 		return nil, err
 	}
 
-	var invite WorkspaceInvite
-
 	err = r.db.QueryRow(ctx, `
-		INSERT INTO workspace_invites (
-			workspace_id,
-			inviter_id,
-			invite_code,
+		INSERT INTO calendar_invites (
+			calendar_id,
+			created_by,
+			code,
 			role,
 			expire_at,
-			max_use_count,
-			created_at
+			max_uses,
+			created_at,
+			updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW())
-		RETURNING
-			id,
-			workspace_id,
-			inviter_id,
-			invite_code,
-			role,
-			expire_at,
-			used_count,
-			max_use_count,
-			created_at
-	`, workspaceID, inviterID, code, role, expireAt, maxUseCount).Scan(
-		&invite.ID,
-		&invite.WorkspaceID,
-		&invite.InviterID,
-		&invite.InviteCode,
-		&invite.Role,
-		&invite.ExpireAt,
-		&invite.UsedCount,
-		&invite.MaxUseCount,
-		&invite.CreatedAt,
-	)
-
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		RETURNING code
+	`, calendarID, inviterID, code, role, expireAt, maxUses).Scan(&code)
 	if err != nil {
 		return nil, err
 	}
@@ -95,40 +85,41 @@ func (r *Repository) CreateInvite(
 	return r.GetInviteByCode(ctx, code)
 }
 
-func (r *Repository) GetInviteByCode(ctx context.Context, code string) (*WorkspaceInvite, error) {
-	var invite WorkspaceInvite
+func (r *Repository) GetInviteByCode(ctx context.Context, code string) (*CalendarInvite, error) {
+	var invite CalendarInvite
 
 	err := r.db.QueryRow(ctx, `
 		SELECT
-			wi.id,
-			wi.workspace_id,
-			ws.name,
-			wi.inviter_id,
+			ci.id,
+			ci.calendar_id,
+			c.name,
+			ci.created_by,
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
-			wi.invite_code,
-			wi.role,
-			wi.expire_at,
-			wi.used_count,
-			wi.max_use_count,
-			wi.created_at
-		FROM workspace_invites wi
-		INNER JOIN workspaces ws ON ws.id = wi.workspace_id
-		INNER JOIN users u ON u.id = wi.inviter_id
-		WHERE wi.invite_code = $1
+			ci.code,
+			ci.role,
+			ci.expire_at,
+			COALESCE(ci.used_count, 0),
+			COALESCE(ci.max_uses, 1),
+			ci.created_at
+		FROM calendar_invites ci
+		INNER JOIN calendars c ON c.id = ci.calendar_id
+		INNER JOIN users u ON u.id = ci.created_by
+		WHERE ci.code = $1
+		  AND ci.deleted_at IS NULL
+		  AND c.deleted_at IS NULL
 	`, code).Scan(
 		&invite.ID,
-		&invite.WorkspaceID,
-		&invite.WorkspaceName,
+		&invite.CalendarID,
+		&invite.CalendarName,
 		&invite.InviterID,
 		&invite.InviterName,
-		&invite.InviteCode,
+		&invite.Code,
 		&invite.Role,
 		&invite.ExpireAt,
 		&invite.UsedCount,
-		&invite.MaxUseCount,
+		&invite.MaxUses,
 		&invite.CreatedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -136,68 +127,140 @@ func (r *Repository) GetInviteByCode(ctx context.Context, code string) (*Workspa
 	return &invite, nil
 }
 
-func (r *Repository) GetWorkspaceMemberRole(ctx context.Context, workspaceID int64, userID int64) (string, error) {
+func (r *Repository) GetCalendarMemberRole(ctx context.Context, calendarID int64, userID int64) (string, error) {
 	var role string
 
 	err := r.db.QueryRow(ctx, `
-		SELECT role
-		FROM workspace_members
-		WHERE workspace_id = $1
-		  AND user_id = $2
-	`, workspaceID, userID).Scan(&role)
+		SELECT cm.role
+		FROM calendar_members cm
+		INNER JOIN calendars c ON c.id = cm.calendar_id
+		WHERE cm.calendar_id = $1
+		  AND cm.user_id = $2
+		  AND cm.status = 'active'
+		  AND c.deleted_at IS NULL
+	`, calendarID, userID).Scan(&role)
 
-	if err != nil {
-		return "", err
-	}
-
-	return role, nil
+	return role, err
 }
 
-func (r *Repository) IsWorkspaceMember(ctx context.Context, workspaceID int64, userID int64) (bool, error) {
+func (r *Repository) IsCalendarMember(ctx context.Context, calendarID int64, userID int64) (bool, error) {
 	var exists bool
 
 	err := r.db.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1
-			FROM workspace_members
-			WHERE workspace_id = $1
-			  AND user_id = $2
+			FROM calendar_members cm
+			INNER JOIN calendars c ON c.id = cm.calendar_id
+			WHERE cm.calendar_id = $1
+			  AND cm.user_id = $2
+			  AND cm.status = 'active'
+			  AND c.deleted_at IS NULL
 		)
-	`, workspaceID, userID).Scan(&exists)
+	`, calendarID, userID).Scan(&exists)
 
 	return exists, err
 }
 
-func (r *Repository) AcceptInvite(ctx context.Context, invite *WorkspaceInvite, userID int64) error {
+func (r *Repository) AcceptInvite(ctx context.Context, code string, userID int64) (*AcceptResult, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `
-		INSERT INTO workspace_members (
-			workspace_id,
-			user_id,
-			role,
-			created_at
-		)
-		VALUES ($1, $2, $3, NOW())
-		ON CONFLICT (workspace_id, user_id)
-		DO UPDATE SET role = workspace_members.role
-	`, invite.WorkspaceID, userID, invite.Role)
+	var invite CalendarInvite
+	err = tx.QueryRow(ctx, `
+		SELECT
+			ci.id,
+			ci.calendar_id,
+			c.name,
+			ci.role,
+			ci.expire_at,
+			COALESCE(ci.used_count, 0),
+			COALESCE(ci.max_uses, 1)
+		FROM calendar_invites ci
+		INNER JOIN calendars c ON c.id = ci.calendar_id
+		WHERE ci.code = $1
+		  AND ci.deleted_at IS NULL
+		  AND c.deleted_at IS NULL
+		FOR UPDATE OF ci
+	`, code).Scan(
+		&invite.ID,
+		&invite.CalendarID,
+		&invite.CalendarName,
+		&invite.Role,
+		&invite.ExpireAt,
+		&invite.UsedCount,
+		&invite.MaxUses,
+	)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	var existingRole string
+	err = tx.QueryRow(ctx, `
+		SELECT role
+		FROM calendar_members
+		WHERE calendar_id = $1
+		  AND user_id = $2
+		  AND status = 'active'
+	`, invite.CalendarID, userID).Scan(&existingRole)
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return &AcceptResult{CalendarID: invite.CalendarID, CalendarName: invite.CalendarName, Role: existingRole, AlreadyJoined: true}, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	if invite.ExpireAt.Before(time.Now()) {
+		return nil, ErrInviteExpired
+	}
+	if invite.MaxUses > 0 && invite.UsedCount >= invite.MaxUses {
+		return nil, ErrInviteLimitReached
 	}
 
 	_, err = tx.Exec(ctx, `
-		UPDATE workspace_invites
-		SET used_count = used_count + 1
+		INSERT INTO calendar_members (
+			calendar_id,
+			user_id,
+			role,
+			status,
+			joined_at,
+			created_at,
+			updated_at
+		)
+		VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
+		ON CONFLICT (calendar_id, user_id)
+		DO UPDATE SET
+			role = EXCLUDED.role,
+			status = 'active',
+			joined_at = NOW(),
+			updated_at = NOW()
+	`, invite.CalendarID, userID, invite.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE calendar_invites
+		SET used_count = used_count + 1,
+		    updated_at = NOW()
 		WHERE id = $1
 	`, invite.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &AcceptResult{CalendarID: invite.CalendarID, CalendarName: invite.CalendarName, Role: invite.Role}, nil
+}
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
 }

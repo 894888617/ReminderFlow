@@ -1,42 +1,41 @@
 import { request } from './request'
 
-export interface WorkspaceInvite {
-  id: number
-  workspace_id: number
-  workspace_name: string
-  inviter_id: number
+export interface CalendarInviteDetail {
+  code: string
+  calendar_id: number
+  calendar_name: string
   inviter_name: string
-  invite_code: string
   role: 'member' | 'viewer'
-  expire_at?: string | null
-  used_count: number
-  max_use_count?: number | null
-  created_at: string
+  expired: boolean
+  accepted: boolean
 }
 
-export interface CreateInviteResult {
-  invite_code: string
-  path: string
-  invite: WorkspaceInvite
+export interface CreateCalendarInviteResult {
+  code: string
+  calendar_id: number
+  calendar_name: string
+  role: 'member' | 'viewer'
+  expire_at: string
+  share_path: string
 }
 
-export function createWorkspaceInvite(
-  workspaceId: number,
+export function createCalendarInvite(
+  calendarId: number,
   data: {
     role: 'member' | 'viewer'
-    expire_hours?: number
-    max_use_count?: number
+    expire_days?: number
+    max_uses?: number
   }
 ) {
-  return request<CreateInviteResult>({
-    url: `/api/workspaces/${workspaceId}/invites`,
+  return request<CreateCalendarInviteResult>({
+    url: `/api/calendars/${calendarId}/invites`,
     method: 'POST',
     data,
   })
 }
 
 export function getInviteDetail(code: string) {
-  return request<WorkspaceInvite>({
+  return request<CalendarInviteDetail>({
     url: `/api/invites/${code}`,
     method: 'GET',
     auth: false,
@@ -44,10 +43,7 @@ export function getInviteDetail(code: string) {
 }
 
 export interface AcceptInviteResult {
-  workspace_id: number
-  workspace_name: string
-  role: 'owner' | 'member' | 'viewer'
-  message: string
+  calendar_id: number
 }
 
 export function acceptInvite(code: string) {
@@ -56,3 +52,6 @@ export function acceptInvite(code: string) {
     method: 'POST',
   })
 }
+
+export const createWorkspaceInvite = createCalendarInvite
+export type WorkspaceInvite = CalendarInviteDetail
