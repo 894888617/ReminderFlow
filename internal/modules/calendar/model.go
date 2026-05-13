@@ -50,3 +50,25 @@ type UpdateCalendarParams struct {
 	Timezone    string
 	CoverURL    string
 }
+
+type CalendarEvent struct {
+	EventID         int64   `json:"event_id"`
+	CalendarID      int64   `json:"calendar_id"`
+	RecordID        *int64  `json:"record_id"`
+	Title           string  `json:"title"`
+	RecordTitle     string  `json:"record_title"`
+	RecordContent   string  `json:"record_content"`
+	Status          string  `json:"status"`
+	AssigneeID      *int64  `json:"assignee_id"`
+	AssigneeName    string  `json:"assignee_name"`
+	StartAt         string  `json:"start_at"`
+	EndAt           *string `json:"end_at"`
+	AllDay          bool    `json:"all_day"`
+	CurrentUserRole string  `json:"current_user_role"`
+}
+
+type CalendarEventTimeParams struct {
+	StartAt time.Time
+	EndAt   *time.Time
+	AllDay  bool
+}

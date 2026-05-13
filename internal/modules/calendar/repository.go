@@ -3,6 +3,7 @@ package calendar
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -274,6 +275,144 @@ func (r *Repository) RemoveMember(ctx context.Context, operatorID, calendarID, m
 		  AND status = 'active'
 	`, calendarID, memberUserID)
 	return err
+}
+
+func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID int64, startAt, endAt time.Time) ([]CalendarEvent, error) {
+	role, err := r.GetUserRole(ctx, userID, calendarID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			ce.id,
+			ce.calendar_id,
+			ce.record_id,
+			ce.title,
+			COALESCE(rec.title, ''),
+			COALESCE(rec.content, ''),
+			LOWER(COALESCE(rec.status, ce.status, '')),
+			rec.assignee_id,
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
+			ce.start_at,
+			ce.end_at,
+			ce.all_day
+		FROM calendar_events ce
+		INNER JOIN calendars c ON c.id = ce.calendar_id
+		INNER JOIN calendar_members cm
+			ON cm.calendar_id = ce.calendar_id
+			AND cm.user_id = $2
+			AND cm.status = 'active'
+		LEFT JOIN records rec ON rec.id = ce.record_id
+		LEFT JOIN users u ON u.id = rec.assignee_id
+		WHERE ce.calendar_id = $1
+		  AND c.deleted_at IS NULL
+		  AND ce.deleted_at IS NULL
+		  AND ce.start_at >= $3
+		  AND ce.start_at < $4
+		  AND (ce.record_id IS NULL OR (rec.id IS NOT NULL AND rec.deleted_at IS NULL))
+		ORDER BY ce.start_at ASC, ce.id ASC
+	`, calendarID, userID, startAt, endAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]CalendarEvent, 0)
+	for rows.Next() {
+		var item CalendarEvent
+		var start time.Time
+		var end *time.Time
+		if err := rows.Scan(
+			&item.EventID,
+			&item.CalendarID,
+			&item.RecordID,
+			&item.Title,
+			&item.RecordTitle,
+			&item.RecordContent,
+			&item.Status,
+			&item.AssigneeID,
+			&item.AssigneeName,
+			&start,
+			&end,
+			&item.AllDay,
+		); err != nil {
+			return nil, err
+		}
+		item.StartAt = formatShanghaiTimestamp(start)
+		if end != nil {
+			formatted := formatShanghaiTimestamp(*end)
+			item.EndAt = &formatted
+		}
+		item.CurrentUserRole = role
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *Repository) UpdateCalendarEventTime(ctx context.Context, userID, eventID int64, params CalendarEventTimeParams) error {
+	calendarID, err := r.getEventCalendarID(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	if err := r.EnsureCalendarEditable(ctx, userID, calendarID); err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		UPDATE calendar_events
+		SET start_at = $2,
+		    end_at = $3,
+		    all_day = $4,
+		    timezone = 'Asia/Shanghai',
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`, eventID, params.StartAt, params.EndAt, params.AllDay)
+	return err
+}
+
+func (r *Repository) DeleteCalendarEvent(ctx context.Context, userID, eventID int64) error {
+	calendarID, err := r.getEventCalendarID(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	if err := r.EnsureCalendarEditable(ctx, userID, calendarID); err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		UPDATE calendar_events
+		SET deleted_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`, eventID)
+	return err
+}
+
+func (r *Repository) getEventCalendarID(ctx context.Context, eventID int64) (int64, error) {
+	var calendarID int64
+	err := r.db.QueryRow(ctx, `
+		SELECT ce.calendar_id
+		FROM calendar_events ce
+		INNER JOIN calendars c ON c.id = ce.calendar_id
+		WHERE ce.id = $1
+		  AND ce.deleted_at IS NULL
+		  AND c.deleted_at IS NULL
+	`, eventID).Scan(&calendarID)
+	return calendarID, err
+}
+
+func formatShanghaiTimestamp(t time.Time) string {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc).Format(time.RFC3339)
 }
 
 func calendarSelectSQL() string {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -30,6 +31,12 @@ type calendarRequest struct {
 
 type updateMemberRoleRequest struct {
 	Role string `json:"role"`
+}
+
+type updateEventTimeRequest struct {
+	StartAt string  `json:"start_at"`
+	EndAt   *string `json:"end_at"`
+	AllDay  bool    `json:"all_day"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -223,6 +230,80 @@ func (h *Handler) RemoveMember(c *gin.Context) {
 	response.OK(c, gin.H{"calendar_id": calendarID, "user_id": memberUserID, "removed": true})
 }
 
+func (h *Handler) ListEvents(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
+		return
+	}
+
+	startAt, endAt, ok := parseDateRange(c)
+	if !ok {
+		return
+	}
+
+	items, err := h.repo.ListCalendarEvents(c.Request.Context(), userID, calendarID, startAt, endAt)
+	if err != nil {
+		handleRepoError(c, err, "query calendar events failed")
+		return
+	}
+
+	response.OK(c, gin.H{"items": items})
+}
+
+func (h *Handler) UpdateEventTime(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	eventID, ok := parseEventID(c)
+	if !ok {
+		return
+	}
+
+	var req updateEventTimeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid request")
+		return
+	}
+
+	params, ok := buildEventTimeParams(c, req)
+	if !ok {
+		return
+	}
+
+	if err := h.repo.UpdateCalendarEventTime(c.Request.Context(), userID, eventID, params); err != nil {
+		handleRepoError(c, err, "update calendar event failed")
+		return
+	}
+
+	response.OK(c, gin.H{"event_id": eventID, "updated": true})
+}
+
+func (h *Handler) DeleteEvent(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	eventID, ok := parseEventID(c)
+	if !ok {
+		return
+	}
+
+	if err := h.repo.DeleteCalendarEvent(c.Request.Context(), userID, eventID); err != nil {
+		handleRepoError(c, err, "delete calendar event failed")
+		return
+	}
+
+	response.OK(c, gin.H{"event_id": eventID, "deleted": true})
+}
+
 func currentUserID(c *gin.Context) (int64, bool) {
 	userID, ok := middleware.GetCurrentUserID(c)
 	if !ok {
@@ -239,6 +320,77 @@ func parseCalendarID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return calendarID, true
+}
+
+func parseEventID(c *gin.Context) (int64, bool) {
+	eventID, err := strconv.ParseInt(c.Param("event_id"), 10, 64)
+	if err != nil || eventID <= 0 {
+		response.BadRequest(c, "invalid event id")
+		return 0, false
+	}
+	return eventID, true
+}
+
+func parseDateRange(c *gin.Context) (time.Time, time.Time, bool) {
+	startText := strings.TrimSpace(c.Query("start"))
+	endText := strings.TrimSpace(c.Query("end"))
+	if startText == "" || endText == "" {
+		response.BadRequest(c, "start and end required")
+		return time.Time{}, time.Time{}, false
+	}
+
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	startAt, err := time.ParseInLocation(time.DateOnly, startText, loc)
+	if err != nil {
+		response.BadRequest(c, "invalid start format, use YYYY-MM-DD")
+		return time.Time{}, time.Time{}, false
+	}
+	endAt, err := time.ParseInLocation(time.DateOnly, endText, loc)
+	if err != nil {
+		response.BadRequest(c, "invalid end format, use YYYY-MM-DD")
+		return time.Time{}, time.Time{}, false
+	}
+	if !endAt.After(startAt) {
+		response.BadRequest(c, "end must be after start")
+		return time.Time{}, time.Time{}, false
+	}
+	return startAt, endAt, true
+}
+
+func buildEventTimeParams(c *gin.Context, req updateEventTimeRequest) (CalendarEventTimeParams, bool) {
+	startText := strings.TrimSpace(req.StartAt)
+	if startText == "" {
+		response.BadRequest(c, "start_at required")
+		return CalendarEventTimeParams{}, false
+	}
+	startAt, err := time.Parse(time.RFC3339, startText)
+	if err != nil {
+		response.BadRequest(c, "invalid start_at format, use RFC3339")
+		return CalendarEventTimeParams{}, false
+	}
+
+	var endAt *time.Time
+	if req.EndAt != nil && strings.TrimSpace(*req.EndAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.EndAt))
+		if err != nil {
+			response.BadRequest(c, "invalid end_at format, use RFC3339")
+			return CalendarEventTimeParams{}, false
+		}
+		if parsed.Before(startAt) {
+			response.BadRequest(c, "end_at must not be before start_at")
+			return CalendarEventTimeParams{}, false
+		}
+		endAt = &parsed
+	}
+
+	return CalendarEventTimeParams{
+		StartAt: startAt,
+		EndAt:   endAt,
+		AllDay:  req.AllDay,
+	}, true
 }
 
 func parseUserID(c *gin.Context) (int64, bool) {
