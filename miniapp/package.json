@@ -10,6 +10,7 @@
     "framework": "React"
   },
   "scripts": {
+    "build": "taro build --type weapp",
     "prepare": "husky",
     "new": "taro new",
     "build:weapp": "taro build --type weapp",

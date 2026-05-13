@@ -6,7 +6,7 @@ import {
   acceptInvite,
   getInviteDetail,
   type CalendarInviteDetail,
-} from '../../api/invite'
+} from '../../api/calendar'
 
 import { getStoredToken } from '../../utils/auth'
 import './index.scss'
@@ -61,10 +61,9 @@ export default function InviteAcceptPage() {
   }
 
   const redirectToCalendar = (calendarId: number) => {
-    Taro.redirectTo({
-      url: `/pages/workspace-detail/index?id=${calendarId}&name=${encodeURIComponent(
-        invite?.calendar_name || ''
-      )}&role=${invite?.role || ''}&joined=1`,
+    Taro.setStorageSync('selected_calendar_id', calendarId)
+    Taro.switchTab({
+      url: '/pages/calendar/index',
     })
   }
 
@@ -161,7 +160,7 @@ export default function InviteAcceptPage() {
       <View className='invite-card'>
         <View className='invite-title'>邀请加入日历</View>
 
-        <View className='workspace-name'>{invite.calendar_name}</View>
+        <View className='calendar-name'>{invite.calendar_name}</View>
 
         <View className='invite-row'>
           <Text className='label'>邀请人</Text>

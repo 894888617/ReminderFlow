@@ -1,23 +1,23 @@
-export type WorkspaceRole = 'owner' | 'member' | 'viewer' | ''
+export type CalendarRole = 'owner' | 'member' | 'viewer' | ''
 
-export function canCreateRecord(role?: WorkspaceRole | string) {
+export function canCreateRecord(role?: CalendarRole | string) {
   return role === 'owner' || role === 'member'
 }
 
-export function canEditRecord(role?: WorkspaceRole | string) {
+export function canEditRecord(role?: CalendarRole | string) {
   return role === 'owner' || role === 'member'
 }
 
-export function canUpdateRecordStatus(role?: WorkspaceRole | string) {
+export function canUpdateRecordStatus(role?: CalendarRole | string) {
   return role === 'owner' || role === 'member'
 }
 
-export function canCreateReminder(role?: WorkspaceRole | string) {
+export function canCreateReminder(role?: CalendarRole | string) {
   return role === 'owner' || role === 'member'
 }
 
 export function canDeleteRecord(
-  role?: WorkspaceRole | string,
+  role?: CalendarRole | string,
   currentUserId?: number,
   creatorId?: number
 ) {
@@ -28,18 +28,18 @@ export function canDeleteRecord(
   return false
 }
 
-export function canInviteMember(role?: WorkspaceRole | string) {
+export function canInviteMember(role?: CalendarRole | string) {
   return role === 'owner'
 }
 
-export function canManageMembers(role?: WorkspaceRole | string) {
+export function canManageMembers(role?: CalendarRole | string) {
   return role === 'owner'
 }
 
-export function canViewMembers(role?: WorkspaceRole | string) {
+export function canViewMembers(role?: CalendarRole | string) {
   return role === 'owner' || role === 'member' || role === 'viewer'
 }
 
-export function isReadonly(role?: WorkspaceRole | string) {
+export function isReadonly(role?: CalendarRole | string) {
   return role === 'viewer'
 }

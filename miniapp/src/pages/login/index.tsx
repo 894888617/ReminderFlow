@@ -196,7 +196,7 @@ export default function LoginPage() {
         </Button>
 
         <Text className='login-tip'>
-          登录后即可创建空间、记录任务并设置提醒。
+          登录后即可创建日历、记录任务并设置提醒。
         </Text>
       </View>
     </View>

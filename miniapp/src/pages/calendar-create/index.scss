@@ -1,3 +1,20 @@
+.create-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  flex-shrink: 0;
+  font-size: 24px;
+  color: #1677ff;
+  background: #eef5ff;
+  border-radius: 999px;
+  padding: 12px 20px;
+  margin-left: 16px;
+}
+
 .form-card {
   background: #ffffff;
   border-radius: 22px;
@@ -33,7 +50,7 @@
 
 .form-textarea {
   width: 100%;
-  min-height: 180px;
+  min-height: 160px;
   background: #f9fafb;
   border-radius: 16px;
   padding: 20px;
@@ -42,32 +59,11 @@
   box-sizing: border-box;
 }
 
-.picker-value,
-.datetime-picker,
-.empty-calendar,
-.empty-member {
-  background: #f9fafb;
-  border-radius: 16px;
-  padding: 22px 20px;
-  font-size: 28px;
-  color: #111827;
-}
-
-.empty-calendar,
-.empty-member {
+.form-tip {
+  margin-top: 12px;
+  font-size: 22px;
   color: #9ca3af;
-}
-
-.datetime-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.clear-time {
-  margin-top: 14px;
-  font-size: 24px;
-  color: #ef4444;
+  line-height: 1.5;
 }
 
 .submit-btn {
@@ -84,33 +80,20 @@
 .submit-btn.disabled {
   background: #93c5fd;
 }
-
-.empty-calendar-guide {
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
   background: #f9fafb;
-  border-radius: 18px;
-  padding: 24px;
-}
-
-.empty-calendar-title {
-  font-size: 28px;
-  font-weight: 800;
-  color: #111827;
-  margin-bottom: 12px;
-}
-
-.empty-calendar-desc {
-  font-size: 24px;
-  color: #6b7280;
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-
-.empty-calendar-btn {
-  background: #1677ff;
-  color: #ffffff;
   border-radius: 16px;
-  padding: 20px 24px;
-  text-align: center;
-  font-size: 26px;
-  font-weight: 800;
+  padding: 0 20px;
+  font-size: 28px;
+  color: #111827;
+}
+
+.color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
 }
