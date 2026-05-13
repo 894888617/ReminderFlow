@@ -37,6 +37,7 @@ type CreateRecordRequest struct {
 	Content         string  `json:"content"`
 	AssigneeID      *int64  `json:"assignee_id"`
 	DueAt           string  `json:"due_at"`
+	RemindAt        string  `json:"remind_at"`
 	CalendarStartAt string  `json:"calendar_start_at"`
 	CalendarEndAt   *string `json:"calendar_end_at"`
 	CalendarAllDay  *bool   `json:"calendar_all_day"`
@@ -59,8 +60,12 @@ func (h *Handler) Create(c *gin.Context) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Content = strings.TrimSpace(req.Content)
 
-	calendarID, ok := parseCalendarID(c)
-	if !ok {
+	calendarID := req.CalendarID
+	if calendarID <= 0 {
+		calendarID = req.WorkspaceID
+	}
+	if calendarID <= 0 {
+		response.BadRequest(c, "calendar_id required")
 		return
 	}
 
@@ -108,16 +113,6 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	calendarStartAt, ok := parseOptionalRFC3339(c, req.CalendarStartAt, "calendar_start_at")
-	if !ok {
-		return
-	}
-
-	calendarEndAt, ok := parseOptionalRFC3339(c, req.CalendarEndAt, "calendar_end_at")
-	if !ok {
-		return
-	}
-
 	var calendarStartAt *time.Time
 	if strings.TrimSpace(req.CalendarStartAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, req.CalendarStartAt)
@@ -142,17 +137,13 @@ func (h *Handler) Create(c *gin.Context) {
 		calendarEndAt = &parsed
 	}
 
-	calendarID := req.CalendarID
-	if calendarID <= 0 {
-		calendarID = req.WorkspaceID
-	}
 	calendarAllDay := true
 	if req.CalendarAllDay != nil {
 		calendarAllDay = *req.CalendarAllDay
 	}
 
 	rec, err := h.repo.Create(c.Request.Context(), CreateRecordParams{
-		WorkspaceID:     req.WorkspaceID,
+		WorkspaceID:     0,
 		CalendarID:      calendarID,
 		Title:           req.Title,
 		Content:         req.Content,
@@ -162,6 +153,7 @@ func (h *Handler) Create(c *gin.Context) {
 		CalendarStartAt: calendarStartAt,
 		CalendarEndAt:   calendarEndAt,
 		CalendarAllDay:  calendarAllDay,
+		RemindAt:        remindAt,
 	})
 
 	if err != nil {
@@ -179,6 +171,30 @@ func (h *Handler) Create(c *gin.Context) {
 		Action:     "CREATE_RECORD",
 		Detail:     "创建记录：" + rec.Title,
 	})
+
+	if err := h.repo.CreateNotification(
+		c.Request.Context(),
+		currentUserID,
+		rec.ID,
+		"RECORD_CREATED",
+		"记录已创建",
+		"你创建了记录："+rec.Title,
+	); err != nil {
+		log.Println("create record notification failed:", err)
+	}
+
+	if rec.AssigneeID != nil && *rec.AssigneeID != currentUserID {
+		if err := h.repo.CreateNotification(
+			c.Request.Context(),
+			*rec.AssigneeID,
+			rec.ID,
+			"RECORD_ASSIGNED",
+			"新的待办记录",
+			"你被分配了记录："+rec.Title,
+		); err != nil {
+			log.Println("create assignee notification failed:", err)
+		}
+	}
 
 	response.OK(c, rec)
 }
@@ -281,7 +297,15 @@ type UpdateStatusRequest struct {
 }
 
 func parseCalendarID(c *gin.Context) (int64, bool) {
-	calendarID, err := strconv.ParseInt(c.Param("calendar_id"), 10, 64)
+	value := strings.TrimSpace(c.Param("calendar_id"))
+	if value == "" {
+		value = strings.TrimSpace(c.Query("calendar_id"))
+	}
+	if value == "" {
+		value = strings.TrimSpace(c.Query("workspace_id"))
+	}
+
+	calendarID, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || calendarID <= 0 {
 		response.BadRequest(c, "invalid calendar id")
 		return 0, false
@@ -430,6 +454,19 @@ func (h *Handler) Update(c *gin.Context) {
 		Action:     "UPDATE_RECORD",
 		Detail:     "更新记录：" + rec.Title,
 	})
+
+	if req.AssigneeID != nil && *req.AssigneeID != currentUserID && (oldRec.AssigneeID == nil || *oldRec.AssigneeID != *req.AssigneeID) {
+		if err := h.repo.CreateNotification(
+			c.Request.Context(),
+			*req.AssigneeID,
+			rec.ID,
+			"ASSIGNEE_CHANGED",
+			"负责人已变更",
+			"你被设置为记录负责人："+rec.Title,
+		); err != nil {
+			log.Println("create update assignee notification failed:", err)
+		}
+	}
 
 	response.OK(c, rec)
 }
@@ -657,6 +694,17 @@ func (h *Handler) TransferAssignee(c *gin.Context) {
 		return
 	}
 
+	if err := h.repo.CreateNotification(
+		c.Request.Context(),
+		req.AssigneeID,
+		recordID,
+		"ASSIGNEE_CHANGED",
+		"负责人已变更",
+		"你被设置为记录负责人："+oldRec.Title,
+	); err != nil {
+		log.Println("create assignee changed notification failed:", err)
+	}
+
 	recordInfo, err := h.repo.GetBasicInfo(c.Request.Context(), recordID)
 	if err != nil {
 		log.Println("get record basic info failed:", err)
@@ -674,6 +722,7 @@ func (h *Handler) TransferAssignee(c *gin.Context) {
 			subscription.SendAssigneeChangedParams{
 				UserID:       req.AssigneeID,
 				RecordID:     recordID,
+				CalendarName: recordInfo.CalendarName,
 				RecordTitle:  recordInfo.Title,
 				OperatorName: operatorName,
 			},

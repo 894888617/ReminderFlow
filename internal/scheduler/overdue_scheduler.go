@@ -48,19 +48,21 @@ func (s *OverdueScheduler) Start() {
 }
 
 type OverdueRecord struct {
-	ID         int64
-	CalendarID int64
-	Title      string
-	CreatorID  int64
-	AssigneeID *int64
-	DueAt      time.Time
+	ID           int64
+	CalendarID   int64
+	CalendarName string
+	Title        string
+	CreatorID    int64
+	AssigneeID   *int64
+	DueAt        time.Time
 }
 
 type overduePush struct {
-	UserID      int64
-	RecordID    int64
-	RecordTitle string
-	DueAt       time.Time
+	UserID       int64
+	RecordID     int64
+	CalendarName string
+	RecordTitle  string
+	DueAt        time.Time
 }
 
 func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
@@ -72,17 +74,19 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 
 	rows, err := tx.Query(ctx, `
 		SELECT
-			id,
-			calendar_id,
-			title,
+			rec.id,
+			rec.calendar_id,
+			COALESCE(c.name, ''),
+			rec.title,
 			creator_id,
 			assignee_id,
 			due_at
-		FROM records
-		WHERE due_at IS NOT NULL
-		  AND due_at < NOW()
-		  AND status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
-		ORDER BY due_at ASC
+		FROM records rec
+		LEFT JOIN calendars c ON c.id = rec.calendar_id
+		WHERE rec.due_at IS NOT NULL
+		  AND rec.due_at < NOW()
+		  AND rec.status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
+		ORDER BY rec.due_at ASC
 		LIMIT 100
 		FOR UPDATE SKIP LOCKED
 	`)
@@ -100,6 +104,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		if err := rows.Scan(
 			&item.ID,
 			&item.CalendarID,
+			&item.CalendarName,
 			&item.Title,
 			&item.CreatorID,
 			&item.AssigneeID,
@@ -143,23 +148,28 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		notificationTitle := "任务已逾期"
 		notificationContent := fmt.Sprintf("记录「%s」已超过截止时间，请尽快处理。", item.Title)
 
-		_, err = tx.Exec(ctx, `
+		tag, err := tx.Exec(ctx, `
 			INSERT INTO notifications (
 				calendar_id,
 				user_id,
 				record_id,
+				notification_type,
 				title,
 				content,
 				read,
 				created_at
 			)
-			VALUES ($1, $2, $3, $4, $5, false, NOW())
-		`, item.CalendarID, notifyUserID, item.ID, notificationTitle, notificationContent)
+			SELECT NULLIF($1, 0), $2, $3, $4, $5, $6, false, NOW()
+			WHERE EXISTS (SELECT 1 FROM users WHERE id = $2)
+		`, item.CalendarID, notifyUserID, item.ID, "OVERDUE", notificationTitle, notificationContent)
 
 		if err != nil {
 			_ = tx.Rollback(ctx)
 			log.Println("create overdue notification failed:", err)
 			continue
+		}
+		if tag.RowsAffected() == 0 {
+			log.Printf("warning: skip overdue notification for missing user_id=%d record_id=%d", notifyUserID, item.ID)
 		}
 
 		detail := fmt.Sprintf("系统自动将记录「%s」标记为 OVERDUE", item.Title)
@@ -183,10 +193,11 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		}
 
 		pendingPushes = append(pendingPushes, overduePush{
-			UserID:      notifyUserID,
-			RecordID:    item.ID,
-			RecordTitle: item.Title,
-			DueAt:       item.DueAt,
+			UserID:       notifyUserID,
+			RecordID:     item.ID,
+			CalendarName: item.CalendarName,
+			RecordTitle:  item.Title,
+			DueAt:        item.DueAt,
 		})
 	}
 
@@ -205,10 +216,11 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		}
 
 		err := s.subscriptionService.SendOverdue(ctx, subscription.SendOverdueParams{
-			UserID:      item.UserID,
-			RecordID:    item.RecordID,
-			RecordTitle: item.RecordTitle,
-			DueTime:     item.DueAt.Format("2006-01-02 15:04"),
+			UserID:       item.UserID,
+			RecordID:     item.RecordID,
+			CalendarName: item.CalendarName,
+			RecordTitle:  item.RecordTitle,
+			DueAt:        item.DueAt.Format("2006-01-02 15:04"),
 		})
 		if err != nil {
 			log.Println("send wechat overdue message failed:", err)
