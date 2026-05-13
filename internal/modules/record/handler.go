@@ -59,8 +59,8 @@ func (h *Handler) Create(c *gin.Context) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Content = strings.TrimSpace(req.Content)
 
-	if req.WorkspaceID <= 0 {
-		response.BadRequest(c, "workspace_id required")
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), req.WorkspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), calendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -86,28 +86,36 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	if req.AssigneeID != nil {
-		isMember, err := h.repo.IsWorkspaceMember(c.Request.Context(), req.WorkspaceID, *req.AssigneeID)
+		isMember, err := h.repo.IsCalendarMember(c.Request.Context(), calendarID, *req.AssigneeID)
 		if err != nil {
 			response.Internal(c, "check assignee failed")
 			return
 		}
 
 		if !isMember {
-			response.BadRequest(c, "assignee is not workspace member")
+			response.BadRequest(c, "assignee is not calendar member")
 			return
 		}
 	}
 
-	var dueAt *time.Time
+	dueAt, ok := parseOptionalRFC3339(c, req.DueAt, "due_at")
+	if !ok {
+		return
+	}
 
-	if strings.TrimSpace(req.DueAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, req.DueAt)
-		if err != nil {
-			response.BadRequest(c, "invalid due_at format, use RFC3339")
-			return
-		}
+	remindAt, ok := parseOptionalRFC3339(c, req.RemindAt, "remind_at")
+	if !ok {
+		return
+	}
 
-		dueAt = &parsed
+	calendarStartAt, ok := parseOptionalRFC3339(c, req.CalendarStartAt, "calendar_start_at")
+	if !ok {
+		return
+	}
+
+	calendarEndAt, ok := parseOptionalRFC3339(c, req.CalendarEndAt, "calendar_end_at")
+	if !ok {
+		return
 	}
 
 	var calendarStartAt *time.Time
@@ -165,11 +173,11 @@ func (h *Handler) Create(c *gin.Context) {
 	userID := currentUserID
 
 	_ = h.repo.CreateOperationLog(c.Request.Context(), CreateOperationLogParams{
-		WorkspaceID: rec.WorkspaceID,
-		RecordID:    &recordID,
-		UserID:      &userID,
-		Action:      "CREATE_RECORD",
-		Detail:      "创建记录：" + rec.Title,
+		CalendarID: rec.CalendarID,
+		RecordID:   &recordID,
+		UserID:     &userID,
+		Action:     "CREATE_RECORD",
+		Detail:     "创建记录：" + rec.Title,
 	})
 
 	response.OK(c, rec)
@@ -182,13 +190,12 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	workspaceID, err := strconv.ParseInt(c.Query("workspace_id"), 10, 64)
-	if err != nil || workspaceID <= 0 {
-		response.BadRequest(c, "workspace_id required")
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), workspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), calendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -220,14 +227,14 @@ func (h *Handler) List(c *gin.Context) {
 			return
 		}
 
-		isMember, err := h.repo.IsWorkspaceMember(c.Request.Context(), workspaceID, id)
+		isMember, err := h.repo.IsCalendarMember(c.Request.Context(), calendarID, id)
 		if err != nil {
 			response.Internal(c, "check assignee failed")
 			return
 		}
 
 		if !isMember {
-			response.BadRequest(c, "assignee is not workspace member")
+			response.BadRequest(c, "assignee is not calendar member")
 			return
 		}
 
@@ -240,13 +247,18 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	result, err := h.repo.ListByWorkspace(c.Request.Context(), ListRecordsParams{
-		WorkspaceID: workspaceID,
-		Page:        page,
-		PageSize:    pageSize,
-		Status:      status,
-		AssigneeID:  assigneeID,
-		Keyword:     keyword,
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
+
+	result, err := h.repo.ListByCalendar(c.Request.Context(), ListRecordsParams{
+		CalendarID: calendarID,
+		Page:       page,
+		PageSize:   pageSize,
+		Status:     status,
+		AssigneeID: assigneeID,
+		Keyword:    keyword,
+		StartDate:  startDate,
+		EndDate:    endDate,
 	})
 
 	if err != nil {
@@ -266,6 +278,31 @@ type UpdateRecordRequest struct {
 
 type UpdateStatusRequest struct {
 	Status string `json:"status"`
+}
+
+func parseCalendarID(c *gin.Context) (int64, bool) {
+	calendarID, err := strconv.ParseInt(c.Param("calendar_id"), 10, 64)
+	if err != nil || calendarID <= 0 {
+		response.BadRequest(c, "invalid calendar id")
+		return 0, false
+	}
+
+	return calendarID, true
+}
+
+func parseOptionalRFC3339(c *gin.Context, value string, field string) (*time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, true
+	}
+
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		response.BadRequest(c, "invalid "+field+" format, use RFC3339")
+		return nil, false
+	}
+
+	return &parsed, true
 }
 
 func parseRecordID(c *gin.Context) (int64, bool) {
@@ -322,7 +359,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), oldRec.WorkspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), oldRec.CalendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -353,26 +390,21 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 
 	if req.AssigneeID != nil {
-		isMember, err := h.repo.IsWorkspaceMember(c.Request.Context(), oldRec.WorkspaceID, *req.AssigneeID)
+		isMember, err := h.repo.IsCalendarMember(c.Request.Context(), oldRec.CalendarID, *req.AssigneeID)
 		if err != nil {
 			response.Internal(c, "check assignee failed")
 			return
 		}
 
 		if !isMember {
-			response.BadRequest(c, "assignee is not workspace member")
+			response.BadRequest(c, "assignee is not calendar member")
 			return
 		}
 	}
 
-	var dueAt *time.Time
-	if strings.TrimSpace(req.DueAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, req.DueAt)
-		if err != nil {
-			response.BadRequest(c, "invalid due_at format, use RFC3339")
-			return
-		}
-		dueAt = &parsed
+	dueAt, ok := parseOptionalRFC3339(c, req.DueAt, "due_at")
+	if !ok {
+		return
 	}
 
 	rec, err := h.repo.Update(c.Request.Context(), UpdateRecordParams{
@@ -392,11 +424,11 @@ func (h *Handler) Update(c *gin.Context) {
 	userID := currentUserID
 
 	_ = h.repo.CreateOperationLog(c.Request.Context(), CreateOperationLogParams{
-		WorkspaceID: rec.WorkspaceID,
-		RecordID:    &recordID,
-		UserID:      &userID,
-		Action:      "UPDATE_RECORD",
-		Detail:      "更新记录：" + rec.Title,
+		CalendarID: rec.CalendarID,
+		RecordID:   &recordID,
+		UserID:     &userID,
+		Action:     "UPDATE_RECORD",
+		Detail:     "更新记录：" + rec.Title,
 	})
 
 	response.OK(c, rec)
@@ -420,14 +452,14 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), rec.WorkspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), rec.CalendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
 	}
 
-	if currentRole != "owner" && rec.CreatorID != currentUserID {
-		response.Forbidden(c, "only owner or creator can delete record")
+	if currentRole != "owner" {
+		response.Forbidden(c, "only calendar owner can delete record")
 		return
 	}
 
@@ -435,11 +467,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	userID := currentUserID
 
 	_ = h.repo.CreateOperationLog(c.Request.Context(), CreateOperationLogParams{
-		WorkspaceID: rec.WorkspaceID,
-		RecordID:    &recordIDValue,
-		UserID:      &userID,
-		Action:      "DELETE_RECORD",
-		Detail:      "删除记录：" + rec.Title,
+		CalendarID: rec.CalendarID,
+		RecordID:   &recordIDValue,
+		UserID:     &userID,
+		Action:     "DELETE_RECORD",
+		Detail:     "删除记录：" + rec.Title,
 	})
 
 	if err := h.repo.Delete(c.Request.Context(), recordID); err != nil {
@@ -472,7 +504,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), oldRec.WorkspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), oldRec.CalendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -506,11 +538,11 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	userID := currentUserID
 
 	_ = h.repo.CreateOperationLog(c.Request.Context(), CreateOperationLogParams{
-		WorkspaceID: rec.WorkspaceID,
-		RecordID:    &recordID,
-		UserID:      &userID,
-		Action:      "UPDATE_STATUS",
-		Detail:      "更新状态为：" + rec.Status,
+		CalendarID: rec.CalendarID,
+		RecordID:   &recordID,
+		UserID:     &userID,
+		Action:     "UPDATE_STATUS",
+		Detail:     "更新状态为：" + rec.Status,
 	})
 
 	response.OK(c, rec)
@@ -550,7 +582,7 @@ func (h *Handler) ListOperationLogs(c *gin.Context) {
 		return
 	}
 
-	_, err = h.repo.GetWorkspaceMemberRole(c.Request.Context(), rec.WorkspaceID, currentUserID)
+	_, err = h.repo.GetCalendarMemberRole(c.Request.Context(), rec.CalendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -587,7 +619,7 @@ func (h *Handler) TransferAssignee(c *gin.Context) {
 		return
 	}
 
-	currentRole, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), oldRec.WorkspaceID, currentUserID)
+	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), oldRec.CalendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -609,14 +641,14 @@ func (h *Handler) TransferAssignee(c *gin.Context) {
 		return
 	}
 
-	isMember, err := h.repo.IsWorkspaceMember(c.Request.Context(), oldRec.WorkspaceID, req.AssigneeID)
+	isMember, err := h.repo.IsCalendarMember(c.Request.Context(), oldRec.CalendarID, req.AssigneeID)
 	if err != nil {
 		response.Internal(c, "check assignee failed")
 		return
 	}
 
 	if !isMember {
-		response.BadRequest(c, "assignee is not workspace member")
+		response.BadRequest(c, "assignee is not calendar member")
 		return
 	}
 

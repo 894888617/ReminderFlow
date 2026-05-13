@@ -385,3 +385,73 @@ DO $$
 BEGIN
     RAISE NOTICE 'ReminderFlow calendar model migration completed; legacy workspace tables are deprecated.';
 END $$;
+
+-- =========================
+-- 9. record-related tables calendar ownership
+-- =========================
+ALTER TABLE reminders
+    ADD COLUMN IF NOT EXISTS calendar_id BIGINT;
+
+ALTER TABLE operation_logs
+    ADD COLUMN IF NOT EXISTS calendar_id BIGINT;
+
+UPDATE reminders rm
+SET calendar_id = rec.calendar_id
+FROM records rec
+WHERE rm.record_id = rec.id
+  AND rm.calendar_id IS NULL
+  AND rec.calendar_id IS NOT NULL;
+
+UPDATE operation_logs ol
+SET calendar_id = rec.calendar_id
+FROM records rec
+WHERE ol.record_id = rec.id
+  AND ol.calendar_id IS NULL
+  AND rec.calendar_id IS NOT NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_reminders_calendar_id'
+    ) THEN
+        ALTER TABLE reminders
+            ADD CONSTRAINT fk_reminders_calendar_id
+            FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_operation_logs_calendar_id'
+    ) THEN
+        ALTER TABLE operation_logs
+            ADD CONSTRAINT fk_operation_logs_calendar_id
+            FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_reminders_calendar_id
+    ON reminders(calendar_id);
+
+CREATE INDEX IF NOT EXISTS idx_operation_logs_calendar_id
+    ON operation_logs(calendar_id);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'records'
+          AND column_name = 'workspace_id'
+          AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE records
+            ALTER COLUMN workspace_id DROP NOT NULL;
+    END IF;
+END $$;

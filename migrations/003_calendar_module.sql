@@ -78,3 +78,30 @@ DO $$
 BEGIN
     RAISE NOTICE 'ReminderFlow calendar module initialized successfully.';
 END $$;
+
+ALTER TABLE reminders
+    ADD COLUMN IF NOT EXISTS calendar_id BIGINT REFERENCES calendars(id) ON DELETE CASCADE;
+
+ALTER TABLE operation_logs
+    ADD COLUMN IF NOT EXISTS calendar_id BIGINT REFERENCES calendars(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_reminders_calendar_id
+    ON reminders(calendar_id);
+
+CREATE INDEX IF NOT EXISTS idx_operation_logs_calendar_id
+    ON operation_logs(calendar_id);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'records'
+          AND column_name = 'workspace_id'
+          AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE records
+            ALTER COLUMN workspace_id DROP NOT NULL;
+    END IF;
+END $$;

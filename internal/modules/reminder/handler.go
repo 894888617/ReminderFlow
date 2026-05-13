@@ -57,13 +57,13 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	workspaceID, err := h.repo.GetRecordWorkspaceID(c.Request.Context(), recordID)
+	calendarID, err := h.repo.GetRecordCalendarID(c.Request.Context(), recordID)
 	if err != nil {
 		response.Forbidden(c, "record not found")
 		return
 	}
 
-	role, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), workspaceID, currentUserID)
+	role, err := h.repo.GetCalendarMemberRole(c.Request.Context(), calendarID, currentUserID)
 	if err != nil {
 		response.Forbidden(c, "no permission")
 		return
@@ -105,6 +105,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	item, err := h.repo.Create(c.Request.Context(), CreateReminderParams{
+		CalendarID: calendarID,
 		RecordID:   recordID,
 		RemindAt:   remindAt,
 		RepeatType: req.RepeatType,
@@ -130,13 +131,13 @@ func (h *Handler) ListByRecord(c *gin.Context) {
 		return
 	}
 
-	workspaceID, err := h.repo.GetRecordWorkspaceID(c.Request.Context(), recordID)
+	calendarID, err := h.repo.GetRecordCalendarID(c.Request.Context(), recordID)
 	if err != nil {
 		response.Forbidden(c, "record not found")
 		return
 	}
 
-	if _, err := h.repo.GetWorkspaceMemberRole(c.Request.Context(), workspaceID, currentUserID); err != nil {
+	if _, err := h.repo.GetCalendarMemberRole(c.Request.Context(), calendarID, currentUserID); err != nil {
 		response.Forbidden(c, "no permission")
 		return
 	}

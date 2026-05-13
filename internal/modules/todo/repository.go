@@ -19,7 +19,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 type TodoRecord struct {
 	ID           int64      `json:"id"`
-	WorkspaceID  int64      `json:"workspace_id"`
+	CalendarID   int64      `json:"calendar_id"`
 	Title        string     `json:"title"`
 	Content      string     `json:"content"`
 	CreatorID    int64      `json:"creator_id"`
@@ -34,7 +34,7 @@ type TodoRecord struct {
 type TodoReminder struct {
 	ID          int64     `json:"id"`
 	RecordID    int64     `json:"record_id"`
-	WorkspaceID int64     `json:"workspace_id"`
+	CalendarID  int64     `json:"calendar_id"`
 	RecordTitle string    `json:"record_title"`
 	AssigneeID  *int64    `json:"assignee_id"`
 	RemindAt    time.Time `json:"remind_at"`
@@ -47,7 +47,7 @@ func (r *Repository) ListDueToday(ctx context.Context, userID int64, start, end 
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -58,9 +58,10 @@ func (r *Repository) ListDueToday(ctx context.Context, userID int64, start, end 
 			rec.created_at,
 			rec.updated_at
 		FROM records rec
-		INNER JOIN workspace_members wm ON wm.workspace_id = rec.workspace_id
+		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
 		LEFT JOIN users u ON u.id = rec.assignee_id
-		WHERE wm.user_id = $1
+		WHERE wm.status = 'active'
+		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
 		  AND rec.due_at >= $2
 		  AND rec.due_at < $3
@@ -80,7 +81,7 @@ func (r *Repository) ListDueToday(ctx context.Context, userID int64, start, end 
 
 		if err := rows.Scan(
 			&item.ID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.Title,
 			&item.Content,
 			&item.CreatorID,
@@ -109,7 +110,7 @@ func (r *Repository) ListRemindersToday(ctx context.Context, userID int64, start
 		SELECT
 			rm.id,
 			rm.record_id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			rec.assignee_id,
 			rm.remind_at,
@@ -118,8 +119,9 @@ func (r *Repository) ListRemindersToday(ctx context.Context, userID int64, start
 			rm.created_at
 		FROM reminders rm
 		INNER JOIN records rec ON rec.id = rm.record_id
-		INNER JOIN workspace_members wm ON wm.workspace_id = rec.workspace_id
-		WHERE wm.user_id = $1
+		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
+		WHERE wm.status = 'active'
+		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
 		  AND rm.remind_at >= $2
 		  AND rm.remind_at < $3
@@ -139,7 +141,7 @@ func (r *Repository) ListRemindersToday(ctx context.Context, userID int64, start
 		if err := rows.Scan(
 			&item.ID,
 			&item.RecordID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.RecordTitle,
 			&item.AssigneeID,
 			&item.RemindAt,
@@ -164,7 +166,7 @@ func (r *Repository) ListUnfinished(ctx context.Context, userID int64) ([]TodoRe
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			COALESCE(rec.content, ''),
 			rec.creator_id,
@@ -175,9 +177,10 @@ func (r *Repository) ListUnfinished(ctx context.Context, userID int64) ([]TodoRe
 			rec.created_at,
 			rec.updated_at
 		FROM records rec
-		INNER JOIN workspace_members wm ON wm.workspace_id = rec.workspace_id
+		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
 		LEFT JOIN users u ON u.id = rec.assignee_id
-		WHERE wm.user_id = $1
+		WHERE wm.status = 'active'
+		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
 		  AND rec.status NOT IN ('DONE', 'CANCELLED')
 		ORDER BY 
@@ -202,7 +205,7 @@ func (r *Repository) ListUnfinished(ctx context.Context, userID int64) ([]TodoRe
 
 		if err := rows.Scan(
 			&item.ID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.Title,
 			&item.Content,
 			&item.CreatorID,
