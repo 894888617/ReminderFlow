@@ -5,9 +5,9 @@ export const TOKEN_STORAGE_KEY = 'token'
 export const USER_STORAGE_KEY = 'user'
 
 const TAB_BAR_URLS = new Set([
-  '/pages/home/index',
+  '/pages/calendar/index',
   '/pages/todo/index',
-  '/pages/workspace/index',
+  '/pages/notification/index',
   '/pages/profile/index',
 ])
 
@@ -35,7 +35,7 @@ export function isTabBarUrl(url: string) {
 }
 
 export function navigateAfterLogin(url?: string) {
-  const targetUrl = url || '/pages/home/index'
+  const targetUrl = url || '/pages/calendar/index'
 
   if (isTabBarUrl(targetUrl)) {
     return Taro.switchTab({

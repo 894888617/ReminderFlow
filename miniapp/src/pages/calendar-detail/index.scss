@@ -80,3 +80,58 @@
 .submit-btn.disabled {
   background: #93c5fd;
 }
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  background: #f9fafb;
+  border-radius: 16px;
+  padding: 0 20px;
+  font-size: 28px;
+  color: #111827;
+}
+
+.color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.detail-header {
+  margin-bottom: 24px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.action-btn {
+  background: #1677ff;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 14px 24px;
+}
+
+.action-btn.green {
+  background: #10b981;
+}
+
+.delete-btn {
+  background: #fef2f2;
+  color: #ef4444;
+  border-radius: 18px;
+  padding: 24px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 40px;
+}
+
+.delete-btn.disabled {
+  color: #fca5a5;
+}

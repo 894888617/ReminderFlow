@@ -9,9 +9,9 @@ import {
   type RecordItem,
 } from '../../api/record'
 import {
-  getWorkspaceMembers,
-  type WorkspaceMember,
-} from '../../api/workspace'
+  listCalendarMembers,
+  type CalendarMember,
+} from '../../api/calendar'
 import {
   canEditRecord,
   canDeleteRecord,
@@ -65,7 +65,7 @@ export default function RecordEditPage() {
 
 
   const [record, setRecord] = useState<RecordItem | null>(null)
-  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [members, setMembers] = useState<CalendarMember[]>([])
 
   const role = record?.current_user_role || ''
   const editable = canEditRecord(role)
@@ -134,7 +134,7 @@ export default function RecordEditPage() {
       setDueDate(due.date)
       setDueTime(due.time)
 
-      const memberList = await getWorkspaceMembers(detail.workspace_id)
+      const memberList = await listCalendarMembers(detail.workspace_id)
       setMembers(memberList || [])
 
       Taro.hideLoading()
@@ -259,11 +259,11 @@ export default function RecordEditPage() {
           setTimeout(() => {
             if (record?.workspace_id) {
               Taro.redirectTo({
-                url: `/pages/workspace-detail/index?id=${record.workspace_id}`,
+                url: `/pages/calendar-detail/index?id=${record.workspace_id}`,
               })
             } else {
               Taro.switchTab({
-                url: '/pages/workspace/index',
+                url: '/pages/calendar/index',
               })
             }
           }, 500)

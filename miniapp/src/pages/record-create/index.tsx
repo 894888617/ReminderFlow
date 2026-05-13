@@ -3,11 +3,12 @@ import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
-  getWorkspaceMembers,
-  getWorkspaces,
-  type Workspace,
-  type WorkspaceMember,
-} from '../../api/workspace'
+  listCalendarMembers,
+  listCalendars,
+  normalizeCalendarRole,
+  type Calendar,
+  type CalendarMember,
+} from '../../api/calendar'
 import { createRecord } from '../../api/record'
 import { canCreateRecord } from '../../utils/permission'
 import { createReminder, type RepeatType } from '../../api/reminder'
@@ -46,11 +47,11 @@ function currentTime() {
 export default function RecordCreatePage() {
   const router = useRouter()
 
-  const routeWorkspaceId = Number(router.params.workspace_id || 0)
+  const routeCalendarId = Number(router.params.calendar_id || router.params.workspace_id || 0)
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [workspaceId, setWorkspaceId] = useState<number>(routeWorkspaceId || 0)
-  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [calendars, setCalendars] = useState<Calendar[]>([])
+  const [calendarId, setCalendarId] = useState<number>(routeCalendarId || 0)
+  const [members, setMembers] = useState<CalendarMember[]>([])
   const [assigneeId, setAssigneeId] = useState<number | undefined>()
 
   const [title, setTitle] = useState('')
@@ -65,18 +66,18 @@ export default function RecordCreatePage() {
   const [repeatIndex, setRepeatIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
 
-  const workspaceNames = useMemo(() => {
-    return workspaces.map((item) => item.name)
-  }, [workspaces])
+  const calendarNames = useMemo(() => {
+    return calendars.map((item) => item.name)
+  }, [calendars])
 
-  const selectedWorkspaceIndex = useMemo(() => {
-    if (!workspaceId) return -1
-    return workspaces.findIndex((item) => item.id === workspaceId)
-  }, [workspaces, workspaceId])
+  const selectedCalendarIndex = useMemo(() => {
+    if (!calendarId) return -1
+    return calendars.findIndex((item) => item.id === calendarId)
+  }, [calendars, calendarId])
 
-  const selectedWorkspace = useMemo(() => {
-    return workspaces.find((item) => item.id === workspaceId)
-  }, [workspaces, workspaceId])
+  const selectedCalendar = useMemo(() => {
+    return calendars.find((item) => item.id === calendarId)
+  }, [calendars, calendarId])
 
   const memberOptions = useMemo(() => {
     return members.map((item) => ({
@@ -96,7 +97,7 @@ export default function RecordCreatePage() {
     return selected?.label || '未分配'
   }, [memberOptions, assigneeId])
 
-  const loadWorkspaces = async () => {
+  const loadCalendars = async () => {
     const token = getStoredToken()
 
     if (!token) {
@@ -107,25 +108,25 @@ export default function RecordCreatePage() {
     }
 
     try {
-      const data = await getWorkspaces()
-      const writableWorkspaces = (data || []).filter((item) =>
-        canCreateRecord(item.role)
+      const data = await listCalendars()
+      const writableCalendars = (data || []).filter((item) =>
+        canCreateRecord(normalizeCalendarRole(item))
       )
 
-      setWorkspaces(writableWorkspaces)
+      setCalendars(writableCalendars)
 
-      if (!workspaceId && writableWorkspaces.length > 0) {
-        setWorkspaceId(writableWorkspaces[0].id)
+      if (!calendarId && writableCalendars.length > 0) {
+        setCalendarId(writableCalendars[0].id)
       }
 
-      if (workspaceId) {
-        const current = writableWorkspaces.find((item) => item.id === workspaceId)
+      if (calendarId) {
+        const current = writableCalendars.find((item) => item.id === calendarId)
         if (!current) {
           Taro.showToast({
-            title: '当前空间无创建权限',
+            title: '当前日历无创建权限',
             icon: 'none',
           })
-          setWorkspaceId(writableWorkspaces[0]?.id || 0)
+          setCalendarId(writableCalendars[0]?.id || 0)
         }
       }
     } catch (err) {
@@ -134,12 +135,12 @@ export default function RecordCreatePage() {
   }
 
   useDidShow(() => {
-    loadWorkspaces()
+    loadCalendars()
   })
 
 
   useEffect(() => {
-    if (!workspaceId) {
+    if (!calendarId) {
       setMembers([])
       setAssigneeId(undefined)
       return
@@ -147,7 +148,7 @@ export default function RecordCreatePage() {
 
     let active = true
 
-    getWorkspaceMembers(workspaceId)
+    listCalendarMembers(calendarId)
       .then((data) => {
         if (!active) return
         setMembers(data || [])
@@ -169,23 +170,23 @@ export default function RecordCreatePage() {
     return () => {
       active = false
     }
-  }, [workspaceId])
+  }, [calendarId])
 
 
   const handleSubmit = async () => {
     if (submitting) return
 
-    if (workspaces.length === 0) {
+    if (calendars.length === 0) {
       Taro.showToast({
-        title: '暂无可创建记录的空间',
+        title: '暂无可创建记录的日历',
         icon: 'none',
       })
       return
     }
 
-    if (!workspaceId) {
+    if (!calendarId) {
       Taro.showToast({
-        title: '请选择空间',
+        title: '请选择日历',
         icon: 'none',
       })
       return
@@ -227,7 +228,7 @@ export default function RecordCreatePage() {
       })
 
       const record = await createRecord({
-        workspace_id: workspaceId,
+        workspace_id: calendarId,
         title: title.trim(),
         content: content.trim(),
         assignee_id: assigneeId,
@@ -268,41 +269,41 @@ export default function RecordCreatePage() {
 
       <View className='form-card'>
         <View className='form-item'>
-          <Text className='form-label'>所属空间</Text>
+          <Text className='form-label'>所属日历</Text>
 
-          {workspaces.length === 0 ? (
-            <View className='empty-workspace-guide'>
-              <View className='empty-workspace-title'>暂无可创建记录的空间</View>
-              <View className='empty-workspace-desc'>
-                你需要先创建一个空间，或者加入有创建权限的空间，才能添加记录。
+          {calendars.length === 0 ? (
+            <View className='empty-calendar-guide'>
+              <View className='empty-calendar-title'>暂无可创建记录的日历</View>
+              <View className='empty-calendar-desc'>
+                你需要先创建一个日历，或者加入有创建权限的日历，才能添加记录。
               </View>
 
               <View
-                className='empty-workspace-btn'
+                className='empty-calendar-btn'
                 onClick={() => {
                   Taro.navigateTo({
-                    url: '/pages/workspace-create/index',
+                    url: '/pages/calendar-create/index',
                   })
                 }}
               >
-                去创建空间
+                去创建日历
               </View>
             </View>
           ) : (
             <Picker
               mode='selector'
-              range={workspaceNames}
-              value={selectedWorkspaceIndex >= 0 ? selectedWorkspaceIndex : 0}
+              range={calendarNames}
+              value={selectedCalendarIndex >= 0 ? selectedCalendarIndex : 0}
               onChange={(e) => {
                 const index = Number(e.detail.value)
-                const selected = workspaces[index]
+                const selected = calendars[index]
                 if (selected) {
-                  setWorkspaceId(selected.id)
+                  setCalendarId(selected.id)
                 }
               }}
             >
               <View className='picker-value'>
-                {selectedWorkspace?.name || '请选择空间'}
+                {selectedCalendar?.name || '请选择日历'}
               </View>
             </Picker>
           )}

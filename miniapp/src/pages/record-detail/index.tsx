@@ -295,7 +295,7 @@ export default function RecordDetailPage() {
 
           setTimeout(() => {
             Taro.redirectTo({
-              url: `/pages/workspace-detail/index?id=${record.workspace_id}`,
+              url: `/pages/calendar-detail/index?id=${record.workspace_id}`,
             })
           }, 500)
         } catch (err) {

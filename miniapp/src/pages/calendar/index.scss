@@ -1,0 +1,186 @@
+.calendar-header,
+.month-head,
+.record-section-head,
+.calendar-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-header {
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.create-calendar-btn,
+.new-record-btn,
+.action-btn,
+.month-btn {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 14px 22px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.create-calendar-btn,
+.new-record-btn,
+.action-btn {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.action-btn.green {
+  background: #10b981;
+}
+
+.action-btn.danger {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.action-btn.disabled {
+  color: #fca5a5;
+}
+
+.calendar-switch-card,
+.month-card,
+.record-card,
+.empty-box,
+.onboarding-empty {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px;
+  margin-bottom: 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.calendar-picker {
+  background: #f9fafb;
+  border-radius: 16px;
+  padding: 22px 20px;
+  font-size: 28px;
+  color: #111827;
+  margin-bottom: 18px;
+}
+
+.calendar-actions {
+  gap: 12px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.month-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.month-btn {
+  background: #eef5ff;
+  color: #1677ff;
+}
+
+.weekday-row,
+.day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.weekday-row {
+  margin: 22px 0 12px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 22px;
+  color: #9ca3af;
+}
+
+.day-cell {
+  position: relative;
+  min-height: 76px;
+  border-radius: 18px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-cell.today {
+  color: #1677ff;
+  font-weight: 900;
+}
+
+.day-cell.active {
+  background: #1677ff;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.event-dot {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-title,
+.onboarding-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.record-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.record-content,
+.record-meta,
+.onboarding-desc,
+.onboarding-tip,
+.empty-box {
+  font-size: 25px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.empty-box {
+  text-align: center;
+  color: #9ca3af;
+}
+
+.onboarding-empty {
+  text-align: center;
+  padding: 40px 28px;
+}
+
+.onboarding-title,
+.onboarding-desc {
+  margin-bottom: 18px;
+}
+
+.onboarding-primary-btn {
+  background: #1677ff;
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 26px 24px;
+  font-size: 30px;
+  font-weight: 800;
+  margin: 24px 0 18px;
+}

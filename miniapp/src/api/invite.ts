@@ -52,6 +52,3 @@ export function acceptInvite(code: string) {
     method: 'POST',
   })
 }
-
-export const createWorkspaceInvite = createCalendarInvite
-export type WorkspaceInvite = CalendarInviteDetail

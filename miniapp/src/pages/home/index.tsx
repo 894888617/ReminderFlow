@@ -2,15 +2,15 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { getMobileHome, type MobileHomeSummary } from '../../api/home'
-import { getWorkspaces, type Workspace } from '../../api/workspace'
+import { listCalendars, normalizeCalendarRole, type Calendar } from '../../api/calendar'
 import { getStoredToken } from '../../utils/auth'
 import { canCreateRecord } from '../../utils/permission'
 import './index.scss'
 
 export default function HomePage() {
   const [data, setData] = useState<MobileHomeSummary | null>(null)
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [workspacesLoaded, setWorkspacesLoaded] = useState(false)
+  const [calendars, setCalendars] = useState<Calendar[]>([])
+  const [calendarsLoaded, setCalendarsLoaded] = useState(false)
 
   const loadData = async () => {
     const token = getStoredToken()
@@ -22,7 +22,7 @@ export default function HomePage() {
       return
     }
 
-    setWorkspacesLoaded(false)
+    setCalendarsLoaded(false)
 
     try {
       const homeRes = await getMobileHome()
@@ -32,13 +32,13 @@ export default function HomePage() {
     }
 
     try {
-      const workspaceRes = await getWorkspaces()
-      setWorkspaces(workspaceRes || [])
+      const calendarRes = await listCalendars()
+      setCalendars(calendarRes || [])
     } catch (err) {
       console.error(err)
-      setWorkspaces([])
+      setCalendars([])
     } finally {
-      setWorkspacesLoaded(true)
+      setCalendarsLoaded(true)
     }
   }
 
@@ -51,8 +51,8 @@ export default function HomePage() {
     Taro.stopPullDownRefresh()
   })
 
-  const hasWorkspace = workspaces.length > 0
-  const writableWorkspace = workspaces.find((item) => canCreateRecord(item.role))
+  const hasCalendar = calendars.length > 0
+  const writableCalendar = calendars.find((item) => canCreateRecord(normalizeCalendarRole(item)))
   const hasAnyRecord = (data?.recent_records || []).length > 0
   const hasNoTasks =
     (data?.today_due_count || 0) === 0 &&
@@ -60,22 +60,22 @@ export default function HomePage() {
     (data?.unfinished_count || 0) === 0 &&
     (data?.overdue_count || 0) === 0 &&
     !hasAnyRecord
-  const shouldShowWorkspaceActions = Boolean(
-    data && workspacesLoaded && hasNoTasks
+  const shouldShowCalendarActions = Boolean(
+    data && calendarsLoaded && hasNoTasks
   )
-  const shouldShowQuickCreate = Boolean(data && workspacesLoaded && !hasNoTasks)
+  const shouldShowQuickCreate = Boolean(data && calendarsLoaded && !hasNoTasks)
 
   const navigateToCreateRecord = () => {
-    if (!writableWorkspace) {
+    if (!writableCalendar) {
       Taro.showToast({
-        title: '暂无可创建记录的空间',
+        title: '暂无可创建记录的日历',
         icon: 'none',
       })
       return
     }
 
     Taro.navigateTo({
-      url: `/pages/record-create/index?workspace_id=${writableWorkspace.id}`,
+      url: `/pages/record-create/index?calendar_id=${writableCalendar.id}`,
     })
   }
 
@@ -90,7 +90,7 @@ export default function HomePage() {
         <View
           className='notice-entry'
           onClick={() => {
-            Taro.navigateTo({
+            Taro.switchTab({
               url: '/pages/notification/index',
             })
           }}
@@ -124,46 +124,46 @@ export default function HomePage() {
         </View>
       </View>
 
-      {shouldShowWorkspaceActions && (
+      {shouldShowCalendarActions && (
         <View className='newbie-card'>
           <View className='newbie-title'>
-            {hasWorkspace ? '空间已准备好' : '开始使用轻记协同'}
+            {hasCalendar ? '日历已准备好' : '开始使用轻记协同'}
           </View>
           <View className='newbie-desc'>
-            {hasWorkspace
-              ? '你已经创建或加入空间，可以查看空间详情，也可以马上创建第一条协作记录。'
-              : '你还没有开始协作记录。建议先创建一个空间，再创建第一条记录。'}
+            {hasCalendar
+              ? '你已经创建或加入日历，可以查看日历详情，也可以马上创建第一条协作记录。'
+              : '你还没有开始协作记录。建议先创建一个日历，再创建第一条记录。'}
           </View>
 
-          {!hasWorkspace && (
+          {!hasCalendar && (
             <View
               className='newbie-primary-btn'
               onClick={() => {
                 Taro.navigateTo({
-                  url: '/pages/workspace-create/index',
+                  url: '/pages/calendar-create/index',
                 })
               }}
             >
-              创建第一个空间
+              创建第一个日历
             </View>
           )}
 
-          {hasWorkspace && (
+          {hasCalendar && (
             <View className='newbie-actions'>
               <View
                 className='newbie-secondary-btn'
                 onClick={() => {
                   Taro.switchTab({
-                    url: '/pages/workspace/index',
+                    url: '/pages/calendar/index',
                   })
                 }}
               >
-                查看我的空间
+                查看我的日历
               </View>
 
               <View
                 className={
-                  writableWorkspace
+                  writableCalendar
                     ? 'newbie-primary-btn'
                     : 'newbie-primary-btn disabled'
                 }
@@ -174,16 +174,16 @@ export default function HomePage() {
             </View>
           )}
 
-          {!hasWorkspace && (
+          {!hasCalendar && (
             <View
               className='newbie-secondary-btn'
               onClick={() => {
                 Taro.switchTab({
-                  url: '/pages/workspace/index',
+                  url: '/pages/calendar/index',
                 })
               }}
             >
-              查看我的空间
+              查看我的日历
             </View>
           )}
         </View>
