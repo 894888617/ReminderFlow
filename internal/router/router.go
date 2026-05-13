@@ -1,6 +1,7 @@
 package router
 
 import (
+	"reminder-flow/internal/modules/calendar"
 	"reminder-flow/internal/modules/invite"
 	"reminder-flow/internal/modules/mobile"
 	"reminder-flow/internal/modules/notification"
@@ -20,7 +21,6 @@ import (
 	"reminder-flow/internal/middleware"
 	"reminder-flow/internal/modules/auth"
 	"reminder-flow/internal/modules/user"
-	"reminder-flow/internal/modules/workspace"
 	"reminder-flow/pkg/response"
 )
 
@@ -66,8 +66,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userRepo := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepo)
 
-	workspaceRepo := workspace.NewRepository(db)
-	workspaceHandler := workspace.NewHandler(workspaceRepo)
+	calendarRepo := calendar.NewRepository(db)
+	calendarHandler := calendar.NewHandler(calendarRepo)
 
 	reminderRepo := reminder.NewRepository(db)
 	reminderHandler := reminder.NewHandler(reminderRepo)
@@ -116,20 +116,20 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		authGroup := api.Group("")
 		authGroup.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
 		{
-			authGroup.POST("/workspaces/:id/invites", inviteHandler.Create)
 			authGroup.POST("/invites/:code/accept", inviteHandler.Accept)
 			authGroup.POST("/wechat/mini/subscriptions", subscriptionHandler.Record)
 
 			authGroup.GET("/users/me", userHandler.Me)
 
-			authGroup.POST("/workspaces", workspaceHandler.Create)
-			authGroup.GET("/workspaces", workspaceHandler.ListMine)
-			authGroup.DELETE("/workspaces/:id", workspaceHandler.Delete)
+			authGroup.GET("/calendars", calendarHandler.ListMine)
+			authGroup.POST("/calendars", calendarHandler.Create)
+			authGroup.GET("/calendars/:calendar_id", calendarHandler.Detail)
+			authGroup.PUT("/calendars/:calendar_id", calendarHandler.Update)
+			authGroup.DELETE("/calendars/:calendar_id", calendarHandler.Delete)
 
-			authGroup.POST("/workspaces/:id/members", workspaceHandler.AddMember)
-			authGroup.GET("/workspaces/:id/members", workspaceHandler.ListMembers)
-			authGroup.DELETE("/workspaces/:id/members/:user_id", workspaceHandler.RemoveMember)
-			authGroup.PUT("/workspaces/:id/members/:user_id/role", workspaceHandler.UpdateMemberRole)
+			authGroup.GET("/calendars/:calendar_id/members", calendarHandler.ListMembers)
+			authGroup.PUT("/calendars/:calendar_id/members/:user_id/role", calendarHandler.UpdateMemberRole)
+			authGroup.DELETE("/calendars/:calendar_id/members/:user_id", calendarHandler.RemoveMember)
 
 			authGroup.POST("/records", recordHandler.Create)
 			authGroup.GET("/records", recordHandler.List)
