@@ -52,6 +52,7 @@ type DueReminder struct {
 	ReminderID   int64
 	RecordID     int64
 	RecordTitle  string
+	CalendarID   int64
 	NotifyUserID int64
 	RemindAt     time.Time
 	RepeatType   string
@@ -76,6 +77,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			rm.id,
 			rm.record_id,
 			rec.title,
+			rec.calendar_id,
 			COALESCE(rec.assignee_id, rec.creator_id),
 			rm.remind_at,
 			rm.repeat_type
@@ -103,6 +105,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 			&item.ReminderID,
 			&item.RecordID,
 			&item.RecordTitle,
+			&item.CalendarID,
 			&item.NotifyUserID,
 			&item.RemindAt,
 			&item.RepeatType,
@@ -128,6 +131,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO notifications (
+				calendar_id,
 				user_id,
 				record_id,
 				title,
@@ -135,8 +139,8 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 				read,
 				created_at
 			)
-			VALUES ($1, $2, $3, $4, false, NOW())
-		`, item.NotifyUserID, item.RecordID, title, content)
+			VALUES ($1, $2, $3, $4, $5, false, NOW())
+		`, item.CalendarID, item.NotifyUserID, item.RecordID, title, content)
 
 		if err != nil {
 			log.Println("create reminder notification failed:", err)

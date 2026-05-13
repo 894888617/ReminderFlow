@@ -48,11 +48,18 @@ func (s *OverdueScheduler) Start() {
 }
 
 type OverdueRecord struct {
-	ID          int64
-	WorkspaceID int64
-	Title       string
-	CreatorID   int64
-	AssigneeID  *int64
+	ID         int64
+	CalendarID int64
+	Title      string
+	CreatorID  int64
+	AssigneeID *int64
+	DueAt      time.Time
+}
+
+type overduePush struct {
+	UserID      int64
+	RecordID    int64
+	RecordTitle string
 	DueAt       time.Time
 }
 
@@ -66,7 +73,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 	rows, err := tx.Query(ctx, `
 		SELECT
 			id,
-			workspace_id,
+			calendar_id,
 			title,
 			creator_id,
 			assignee_id,
@@ -92,7 +99,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 
 		if err := rows.Scan(
 			&item.ID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.Title,
 			&item.CreatorID,
 			&item.AssigneeID,
@@ -109,6 +116,8 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		log.Println("iterate overdue records failed:", err)
 		return err
 	}
+
+	pendingPushes := make([]overduePush, 0, len(overdueList))
 
 	for _, item := range overdueList {
 		_, err := tx.Exec(ctx, `
@@ -136,6 +145,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO notifications (
+				calendar_id,
 				user_id,
 				record_id,
 				title,
@@ -143,8 +153,8 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 				read,
 				created_at
 			)
-			VALUES ($1, $2, $3, $4, false, NOW())
-		`, notifyUserID, item.ID, notificationTitle, notificationContent)
+			VALUES ($1, $2, $3, $4, $5, false, NOW())
+		`, item.CalendarID, notifyUserID, item.ID, notificationTitle, notificationContent)
 
 		if err != nil {
 			_ = tx.Rollback(ctx)
@@ -156,7 +166,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO operation_logs (
-				workspace_id,
+				calendar_id,
 				record_id,
 				user_id,
 				action,
@@ -164,7 +174,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 				created_at
 			)
 			VALUES ($1, $2, NULL, $3, $4, NOW())
-		`, item.WorkspaceID, item.ID, "SYSTEM_OVERDUE", detail)
+		`, item.CalendarID, item.ID, "SYSTEM_OVERDUE", detail)
 
 		if err != nil {
 			_ = tx.Rollback(ctx)
@@ -172,26 +182,38 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 			continue
 		}
 
-		if err := tx.Commit(ctx); err != nil {
-			log.Println("commit overdue tx failed:", err)
+		pendingPushes = append(pendingPushes, overduePush{
+			UserID:      notifyUserID,
+			RecordID:    item.ID,
+			RecordTitle: item.Title,
+			DueAt:       item.DueAt,
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Println("commit overdue tx failed:", err)
+		return err
+	}
+
+	if len(overdueList) > 0 {
+		log.Printf("marked overdue records and sent notifications: %d", len(overdueList))
+	}
+
+	for _, item := range pendingPushes {
+		if s.subscriptionService == nil || item.UserID <= 0 {
 			continue
 		}
 
-		if len(overdueList) > 0 {
-			log.Printf("marked overdue records and sent notifications: %d", len(overdueList))
-		}
-
-		if s.subscriptionService != nil && notifyUserID > 0 {
-			err := s.subscriptionService.SendOverdue(ctx, subscription.SendOverdueParams{
-				UserID:      notifyUserID,
-				RecordID:    item.ID,
-				RecordTitle: item.Title,
-				DueTime:     item.DueAt.Format("2006-01-02 15:04"),
-			})
-			if err != nil {
-				log.Println("send wechat overdue message failed:", err)
-			}
+		err := s.subscriptionService.SendOverdue(ctx, subscription.SendOverdueParams{
+			UserID:      item.UserID,
+			RecordID:    item.RecordID,
+			RecordTitle: item.RecordTitle,
+			DueTime:     item.DueAt.Format("2006-01-02 15:04"),
+		})
+		if err != nil {
+			log.Println("send wechat overdue message failed:", err)
 		}
 	}
+
 	return nil
 }

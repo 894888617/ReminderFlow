@@ -20,7 +20,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 type Reminder struct {
 	ID          int64     `json:"id"`
 	RecordID    int64     `json:"record_id"`
-	WorkspaceID int64     `json:"workspace_id"`
+	CalendarID  int64     `json:"calendar_id"`
 	RecordTitle string    `json:"record_title"`
 	AssigneeID  *int64    `json:"assignee_id"`
 	RemindAt    time.Time `json:"remind_at"`
@@ -30,32 +30,34 @@ type Reminder struct {
 }
 
 type CreateReminderParams struct {
+	CalendarID int64
 	RecordID   int64
 	RemindAt   time.Time
 	RepeatType string
 }
 
-func (r *Repository) GetRecordWorkspaceID(ctx context.Context, recordID int64) (int64, error) {
-	var workspaceID int64
+func (r *Repository) GetRecordCalendarID(ctx context.Context, recordID int64) (int64, error) {
+	var calendarID int64
 
 	err := r.db.QueryRow(ctx, `
-		SELECT workspace_id
+		SELECT calendar_id
 		FROM records
 		WHERE id = $1
-	`, recordID).Scan(&workspaceID)
+	`, recordID).Scan(&calendarID)
 
-	return workspaceID, err
+	return calendarID, err
 }
 
-func (r *Repository) GetWorkspaceMemberRole(ctx context.Context, workspaceID, userID int64) (string, error) {
+func (r *Repository) GetCalendarMemberRole(ctx context.Context, calendarID, userID int64) (string, error) {
 	var role string
 
 	err := r.db.QueryRow(ctx, `
 		SELECT role
-		FROM workspace_members
-		WHERE workspace_id = $1
+		FROM calendar_members
+		WHERE calendar_id = $1
 		  AND user_id = $2
-	`, workspaceID, userID).Scan(&role)
+		  AND status = 'active' 
+	`, calendarID, userID).Scan(&role)
 
 	return role, err
 }
@@ -65,25 +67,29 @@ func (r *Repository) Create(ctx context.Context, params CreateReminderParams) (*
 
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO reminders (
+			calendar_id,
 			record_id,
 			remind_at,
 			repeat_type,
 			notified
 		)
-		VALUES ($1, $2, $3, false)
+		VALUES ($1, $2, $3, $4, false)
 		RETURNING
 			id,
+			calendar_id,
 			record_id,
 			remind_at,
 			repeat_type,
 			notified,
 			created_at
 	`,
+		params.CalendarID,
 		params.RecordID,
 		params.RemindAt,
 		params.RepeatType,
 	).Scan(
 		&item.ID,
+		&item.CalendarID,
 		&item.RecordID,
 		&item.RemindAt,
 		&item.RepeatType,
@@ -103,7 +109,7 @@ func (r *Repository) ListByRecord(ctx context.Context, recordID int64) ([]Remind
 		SELECT
 			rm.id,
 			rm.record_id,
-		rec.workspace_id,
+		rec.calendar_id,
 		rec.title,
 		rec.assignee_id,
 		rm.remind_at,
@@ -129,7 +135,7 @@ func (r *Repository) ListByRecord(ctx context.Context, recordID int64) ([]Remind
 		if err := rows.Scan(
 			&item.ID,
 			&item.RecordID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.RecordTitle,
 			&item.AssigneeID,
 			&item.RemindAt,
@@ -155,7 +161,7 @@ func (r *Repository) ListToday(ctx context.Context, userID int64, start, end tim
 		SELECT
 			rm.id,
 			rm.record_id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			rec.assignee_id,
 			rm.remind_at,
@@ -164,8 +170,9 @@ func (r *Repository) ListToday(ctx context.Context, userID int64, start, end tim
 			rm.created_at
 		FROM reminders rm
 		INNER JOIN records rec ON rec.id = rm.record_id
-		INNER JOIN workspace_members wm ON wm.workspace_id = rec.workspace_id
-		WHERE wm.user_id = $1
+		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
+		WHERE wm.status = 'active'
+		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
 		  AND rm.remind_at >= $2
 		  AND rm.remind_at < $3
@@ -186,7 +193,7 @@ func (r *Repository) ListToday(ctx context.Context, userID int64, start, end tim
 		if err := rows.Scan(
 			&item.ID,
 			&item.RecordID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.RecordTitle,
 			&item.AssigneeID,
 			&item.RemindAt,
@@ -212,7 +219,7 @@ func (r *Repository) ListUpcoming(ctx context.Context, userID int64, now time.Ti
 		SELECT
 			rm.id,
 			rm.record_id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			rec.assignee_id,
 			rm.remind_at,
@@ -221,8 +228,9 @@ func (r *Repository) ListUpcoming(ctx context.Context, userID int64, now time.Ti
 			rm.created_at
 		FROM reminders rm
 		INNER JOIN records rec ON rec.id = rm.record_id
-		INNER JOIN workspace_members wm ON wm.workspace_id = rec.workspace_id
-		WHERE wm.user_id = $1
+		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
+		WHERE wm.status = 'active'
+		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
 		  AND rm.remind_at >= $2
 		ORDER BY rm.remind_at ASC
@@ -243,7 +251,7 @@ func (r *Repository) ListUpcoming(ctx context.Context, userID int64, now time.Ti
 		if err := rows.Scan(
 			&item.ID,
 			&item.RecordID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.RecordTitle,
 			&item.AssigneeID,
 			&item.RemindAt,

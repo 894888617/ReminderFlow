@@ -18,18 +18,20 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 type Notification struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	RecordID  *int64    `json:"record_id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	Read      bool      `json:"read"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int64     `json:"id"`
+	CalendarID *int64    `json:"calendar_id"`
+	UserID     int64     `json:"user_id"`
+	RecordID   *int64    `json:"record_id"`
+	Title      string    `json:"title"`
+	Content    string    `json:"content"`
+	Read       bool      `json:"read"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 func (r *Repository) Create(ctx context.Context, userID int64, recordID int64, title, content string) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO notifications (
+			calendar_id,
 			user_id,
 			record_id,
 			title,
@@ -37,7 +39,9 @@ func (r *Repository) Create(ctx context.Context, userID int64, recordID int64, t
 			read,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, false, NOW())
+		SELECT rec.calendar_id, $1, $2, $3, $4, false, NOW()
+		FROM records rec
+		WHERE rec.id = $2
 	`, userID, recordID, title, content)
 
 	return err
@@ -47,6 +51,7 @@ func (r *Repository) ListByUser(ctx context.Context, userID int64) ([]Notificati
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id,
+			calendar_id,
 			user_id,
 			record_id,
 			title,
@@ -72,6 +77,7 @@ func (r *Repository) ListByUser(ctx context.Context, userID int64) ([]Notificati
 
 		if err := rows.Scan(
 			&item.ID,
+			&item.CalendarID,
 			&item.UserID,
 			&item.RecordID,
 			&item.Title,
