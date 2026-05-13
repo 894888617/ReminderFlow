@@ -26,7 +26,7 @@ type RecentNotification struct {
 
 type RecentRecord struct {
 	ID           int64      `json:"id"`
-	WorkspaceID  int64      `json:"workspace_id"`
+	CalendarID   int64      `json:"calendar_id"`
 	Title        string     `json:"title"`
 	Status       string     `json:"status"`
 	DueAt        *time.Time `json:"due_at"`
@@ -56,11 +56,14 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 
 	if err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*)
-		FROM records
-		WHERE assignee_id = $1
-		  AND due_at >= $2
-		  AND due_at < $3
-		  AND status NOT IN ('DONE', 'CANCELLED')
+		FROM records rec
+		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
+		WHERE cm.user_id = $1
+		  AND cm.status = 'active'
+		  AND rec.assignee_id = $1
+		  AND rec.due_at >= $2
+		  AND rec.due_at < $3
+		  AND rec.status NOT IN ('DONE', 'CANCELLED')
 	`, userID, todayStart, tomorrowStart).Scan(&result.TodayDueCount); err != nil {
 		return nil, err
 	}
@@ -69,7 +72,10 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		SELECT COUNT(*)
 		FROM reminders rem
 		INNER JOIN records rec ON rec.id = rem.record_id
-		WHERE rec.assignee_id = $1
+		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
+		WHERE cm.user_id = $1
+		  AND cm.status = 'active'
+		  AND rec.assignee_id = $1
 		  AND rem.remind_at >= $2
 		  AND rem.remind_at < $3
 	`, userID, todayStart, tomorrowStart).Scan(&result.TodayReminderCount); err != nil {
@@ -78,18 +84,24 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 
 	if err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*)
-		FROM records
-		WHERE assignee_id = $1
-		  AND status NOT IN ('DONE', 'CANCELLED')
+		FROM records rec
+		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
+		WHERE cm.user_id = $1
+		  AND cm.status = 'active'
+		  AND rec.assignee_id = $1
+		  AND rec.status NOT IN ('DONE', 'CANCELLED')
 	`, userID).Scan(&result.UnfinishedCount); err != nil {
 		return nil, err
 	}
 
 	if err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*)
-		FROM records
-		WHERE assignee_id = $1
-		  AND status = 'OVERDUE'
+		FROM records rec
+		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
+		WHERE cm.user_id = $1
+		  AND cm.status = 'active'
+		  AND rec.assignee_id = $1
+		  AND rec.status = 'OVERDUE'
 	`, userID).Scan(&result.OverdueCount); err != nil {
 		return nil, err
 	}
@@ -144,7 +156,7 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 	recordRows, err := r.db.Query(ctx, `
 		SELECT
 			rec.id,
-			rec.workspace_id,
+			rec.calendar_id,
 			rec.title,
 			rec.status,
 			rec.due_at,
@@ -153,7 +165,10 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 			rec.created_at
 		FROM records rec
 		LEFT JOIN users u ON u.id = rec.assignee_id
-		WHERE rec.assignee_id = $1
+		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
+		WHERE cm.user_id = $1
+		  AND cm.status = 'active'
+		  AND rec.assignee_id = $1
 		  AND rec.status NOT IN ('DONE', 'CANCELLED')
 		ORDER BY
 			CASE WHEN rec.status = 'OVERDUE' THEN 1 ELSE 2 END,
@@ -171,7 +186,7 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		var item RecentRecord
 		if err := recordRows.Scan(
 			&item.ID,
-			&item.WorkspaceID,
+			&item.CalendarID,
 			&item.Title,
 			&item.Status,
 			&item.DueAt,
