@@ -66,6 +66,10 @@ export interface CreateRecordParams {
   content?: string
   assignee_id?: number
   due_at?: string
+
+  calendar_start_at?: string
+  calendar_end_at?: string | null
+  calendar_all_day?: boolean
 }
 
 export function createRecord(data: CreateRecordParams) {

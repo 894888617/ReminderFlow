@@ -13,7 +13,7 @@ import { createRecord } from '../../api/record'
 import { canCreateRecord } from '../../utils/permission'
 import { createReminder, type RepeatType } from '../../api/reminder'
 
-import { getStoredToken } from '../../utils/auth'
+import { getStoredToken, getStoredUser } from '../../utils/auth'
 import { getUserNameDisplay } from '../../utils/userDisplay'
 import './index.scss'
 
@@ -37,17 +37,36 @@ function todayDate() {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function currentTime() {
-  const d = new Date()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh}:${mm}`
+// function currentTime() {
+//   const d = new Date()
+//   const hh = String(d.getHours()).padStart(2, '0')
+//   const mm = String(d.getMinutes()).padStart(2, '0')
+//   return `${hh}:${mm}`
+// }
+
+const DEFAULT_DUE_TIME = '20:00'
+const DEFAULT_REMIND_TIME = '18:00'
+
+function addDays(dateText: string, days: number) {
+  const [yyyy, mm, dd] = dateText.split('-').map(Number)
+  const date = new Date(yyyy, (mm || 1) - 1, dd || 1)
+  date.setDate(date.getDate() + days)
+
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+
+  return `${y}-${m}-${d}`
 }
 
 export default function RecordCreatePage() {
   const router = useRouter()
 
   const routeCalendarId = Number(router.params.calendar_id || router.params.workspace_id || 0)
+  const selectedDate = String(router.params.selected_date || '')
+  const currentUser = getStoredUser()
+  const defaultDueDate = selectedDate || todayDate()
+  const defaultRemindDate = addDays(defaultDueDate, -1)
 
   const [calendars, setCalendars] = useState<Calendar[]>([])
   const [calendarId, setCalendarId] = useState<number>(routeCalendarId || 0)
@@ -57,11 +76,11 @@ export default function RecordCreatePage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
 
-  const [dueDate, setDueDate] = useState('')
-  const [dueTime, setDueTime] = useState('')
+  const [dueDate, setDueDate] = useState(defaultDueDate)
+  const [dueTime, setDueTime] = useState(DEFAULT_DUE_TIME)
 
-  const [remindDate, setRemindDate] = useState('')
-  const [remindTime, setRemindTime] = useState('')
+  const [remindDate, setRemindDate] = useState(defaultRemindDate)
+  const [remindTime, setRemindTime] = useState(DEFAULT_REMIND_TIME)
 
   const [repeatIndex, setRepeatIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -93,6 +112,7 @@ export default function RecordCreatePage() {
 
   const selectedAssigneeName = useMemo(() => {
     if (!assigneeId) return '未分配'
+
     const selected = memberOptions.find((item) => item.value === assigneeId)
     return selected?.label || '未分配'
   }, [memberOptions, assigneeId])
@@ -115,17 +135,28 @@ export default function RecordCreatePage() {
 
       setCalendars(writableCalendars)
 
+      if (routeCalendarId) {
+        const target = writableCalendars.find((item) => item.id === routeCalendarId)
+
+        if (target) {
+          setCalendarId(target.id)
+          return
+        }
+
+        Taro.showToast({
+          title: '当前日历无创建权限',
+          icon: 'none',
+        })
+      }
+
       if (!calendarId && writableCalendars.length > 0) {
         setCalendarId(writableCalendars[0].id)
       }
 
       if (calendarId) {
         const current = writableCalendars.find((item) => item.id === calendarId)
+
         if (!current) {
-          Taro.showToast({
-            title: '当前日历无创建权限',
-            icon: 'none',
-          })
           setCalendarId(writableCalendars[0]?.id || 0)
         }
       }
@@ -137,7 +168,6 @@ export default function RecordCreatePage() {
   useDidShow(() => {
     loadCalendars()
   })
-
 
   useEffect(() => {
     if (!calendarId) {
@@ -151,16 +181,26 @@ export default function RecordCreatePage() {
     listCalendarMembers(calendarId)
       .then((data) => {
         if (!active) return
-        setMembers(data || [])
+
+        const items = data || []
+
+        setMembers(items)
+
         setAssigneeId((current) => {
-          if (!current) return current
-          return (data || []).some((item) => item.user_id === current)
-            ? current
-            : undefined
+          if (current && items.some((item) => item.user_id === current)) {
+            return current
+          }
+
+          if (currentUser?.id && items.some((item) => item.user_id === currentUser.id)) {
+            return currentUser.id
+          }
+
+          return undefined
         })
       })
       .catch((err) => {
         console.error(err)
+
         if (active) {
           setMembers([])
           setAssigneeId(undefined)
@@ -171,7 +211,6 @@ export default function RecordCreatePage() {
       active = false
     }
   }, [calendarId])
-
 
   const handleSubmit = async () => {
     if (submitting) return
@@ -200,8 +239,13 @@ export default function RecordCreatePage() {
       return
     }
 
-    const dueAt = buildDateTime(dueDate, dueTime)
-    const remindAt = buildDateTime(remindDate, remindTime)
+    const finalDueDate = dueDate || defaultDueDate
+    const finalDueTime = dueTime || DEFAULT_DUE_TIME
+    const finalRemindDate = remindDate || defaultRemindDate
+    const finalRemindTime = remindTime || DEFAULT_REMIND_TIME
+
+    const dueAt = buildDateTime(finalDueDate, finalDueTime)
+    const remindAt = buildDateTime(finalRemindDate, finalRemindTime)
 
     if ((dueDate && !dueTime) || (!dueDate && dueTime)) {
       Taro.showToast({
@@ -233,6 +277,12 @@ export default function RecordCreatePage() {
         content: content.trim(),
         assignee_id: assigneeId,
         due_at: dueAt,
+
+        calendar_start_at: selectedDate
+          ? `${selectedDate}T00:00:00+08:00`
+          : undefined,
+        calendar_end_at: selectedDate ? null : undefined,
+        calendar_all_day: selectedDate ? true : undefined,
       })
 
       if (remindAt) {
@@ -250,6 +300,13 @@ export default function RecordCreatePage() {
       })
 
       setTimeout(() => {
+        if (selectedDate) {
+          Taro.redirectTo({
+            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${selectedDate}`,
+          })
+          return
+        }
+
         Taro.redirectTo({
           url: `/pages/record-detail/index?id=${record.id}`,
         })
@@ -265,7 +322,10 @@ export default function RecordCreatePage() {
   return (
     <View className='container'>
       <View className='page-title'>创建记录</View>
-      <View className='page-desc'>快速创建协同记录，可设置截止时间和提醒时间。</View>
+      <View className='page-desc'>
+        快速创建协同记录，可设置截止时间和提醒时间。
+        {selectedDate ? ` 当前日历日期：${selectedDate}` : ''}
+      </View>
 
       <View className='form-card'>
         <View className='form-item'>
@@ -297,6 +357,7 @@ export default function RecordCreatePage() {
               onChange={(e) => {
                 const index = Number(e.detail.value)
                 const selected = calendars[index]
+
                 if (selected) {
                   setCalendarId(selected.id)
                 }
@@ -344,6 +405,7 @@ export default function RecordCreatePage() {
               onChange={(e) => {
                 const index = Number(e.detail.value)
                 const selected = memberOptions[index]
+
                 if (selected) {
                   setAssigneeId(selected.value)
                 }
@@ -373,21 +435,21 @@ export default function RecordCreatePage() {
           <View className='datetime-row'>
             <Picker
               mode='date'
-              value={dueDate || todayDate()}
+              value={dueDate || defaultDueDate}
               onChange={(e) => setDueDate(String(e.detail.value))}
             >
               <View className='datetime-picker'>
-                {dueDate || '选择日期'}
+                {dueDate || defaultDueDate}
               </View>
             </Picker>
 
             <Picker
               mode='time'
-              value={dueTime || currentTime()}
+              value={dueTime || DEFAULT_DUE_TIME}
               onChange={(e) => setDueTime(String(e.detail.value))}
             >
               <View className='datetime-picker'>
-                {dueTime || '选择时间'}
+                {dueTime || DEFAULT_DUE_TIME}
               </View>
             </Picker>
           </View>
@@ -396,8 +458,8 @@ export default function RecordCreatePage() {
             <View
               className='clear-time'
               onClick={() => {
-                setDueDate('')
-                setDueTime('')
+                setDueDate(defaultDueDate)
+                setDueTime(DEFAULT_DUE_TIME)
               }}
             >
               清除截止时间
@@ -411,21 +473,21 @@ export default function RecordCreatePage() {
           <View className='datetime-row'>
             <Picker
               mode='date'
-              value={remindDate || todayDate()}
+              value={remindDate || defaultRemindDate}
               onChange={(e) => setRemindDate(String(e.detail.value))}
             >
               <View className='datetime-picker'>
-                {remindDate || '选择日期'}
+                {remindDate || defaultRemindDate}
               </View>
             </Picker>
 
             <Picker
               mode='time'
-              value={remindTime || currentTime()}
+              value={remindTime || DEFAULT_REMIND_TIME}
               onChange={(e) => setRemindTime(String(e.detail.value))}
             >
               <View className='datetime-picker'>
-                {remindTime || '选择时间'}
+                {remindTime || DEFAULT_REMIND_TIME}
               </View>
             </Picker>
           </View>
@@ -434,8 +496,8 @@ export default function RecordCreatePage() {
             <View
               className='clear-time'
               onClick={() => {
-                setRemindDate('')
-                setRemindTime('')
+                setRemindDate(defaultRemindDate)
+                setRemindTime(DEFAULT_REMIND_TIME)
               }}
             >
               清除提醒时间
