@@ -3,6 +3,7 @@ package calendar
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,6 +13,7 @@ import (
 var (
 	ErrNoPermission      = errors.New("no permission")
 	ErrCannotManageOwner = errors.New("cannot manage owner")
+	ErrMemberExists      = errors.New("member already exists")
 )
 
 type Repository struct {
@@ -229,6 +231,93 @@ func (r *Repository) ListCalendarMembers(ctx context.Context, userID, calendarID
 		return nil, err
 	}
 	return items, nil
+}
+
+func (r *Repository) AddMemberByAccount(
+	ctx context.Context,
+	operatorID int64,
+	calendarID int64,
+	account string,
+	role string,
+) (*CalendarMember, error) {
+	if err := r.EnsureCalendarOwner(ctx, operatorID, calendarID); err != nil {
+		return nil, err
+	}
+
+	account = strings.TrimSpace(account)
+	if account == "" {
+		return nil, pgx.ErrNoRows
+	}
+
+	var targetUserID int64
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM users
+		WHERE username = $1
+		   OR email = $1
+		   OR nickname = $1
+		LIMIT 1
+	`, account).Scan(&targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if targetUserID == operatorID {
+		return nil, ErrCannotManageOwner
+	}
+
+	existingRole, err := r.GetUserRole(ctx, targetUserID, calendarID)
+	if err == nil && existingRole != "" {
+		return nil, ErrMemberExists
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO calendar_members (calendar_id, user_id, role, status, joined_at)
+		VALUES ($1, $2, $3, 'active', NOW())
+		ON CONFLICT (calendar_id, user_id)
+		DO UPDATE SET
+			role = EXCLUDED.role,
+			status = 'active',
+			joined_at = COALESCE(calendar_members.joined_at, NOW())
+	`, calendarID, targetUserID, role)
+	if err != nil {
+		return nil, err
+	}
+
+	var member CalendarMember
+	err = r.db.QueryRow(ctx, `
+		SELECT
+			cm.id,
+			cm.calendar_id,
+			cm.user_id,
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
+			COALESCE(u.avatar_url, ''),
+			cm.role,
+			cm.status,
+			cm.joined_at
+		FROM calendar_members cm
+		INNER JOIN users u ON u.id = cm.user_id
+		WHERE cm.calendar_id = $1
+		  AND cm.user_id = $2
+		  AND cm.status = 'active'
+	`, calendarID, targetUserID).Scan(
+		&member.ID,
+		&member.CalendarID,
+		&member.UserID,
+		&member.Nickname,
+		&member.AvatarURL,
+		&member.Role,
+		&member.Status,
+		&member.JoinedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &member, nil
 }
 
 func (r *Repository) UpdateMemberRole(ctx context.Context, operatorID, calendarID, memberUserID int64, role string) error {

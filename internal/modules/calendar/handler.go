@@ -33,6 +33,11 @@ type updateMemberRoleRequest struct {
 	Role string `json:"role"`
 }
 
+type addMemberRequest struct {
+	Account string `json:"account"`
+	Role    string `json:"role"`
+}
+
 type updateEventTimeRequest struct {
 	StartAt string  `json:"start_at"`
 	EndAt   *string `json:"end_at"`
@@ -168,6 +173,48 @@ func (h *Handler) ListMembers(c *gin.Context) {
 	}
 
 	response.OK(c, items)
+}
+
+func (h *Handler) AddMember(c *gin.Context) {
+	operatorID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
+		return
+	}
+
+	var req addMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid request")
+		return
+	}
+
+	account := strings.TrimSpace(req.Account)
+	if account == "" {
+		response.BadRequest(c, "account required")
+		return
+	}
+
+	req.Role = strings.ToLower(strings.TrimSpace(req.Role))
+	if req.Role == "" {
+		req.Role = RoleMember
+	}
+
+	if req.Role != RoleMember && req.Role != RoleViewer {
+		response.Fail(c, http.StatusBadRequest, response.CodeInvalidRole, "invalid role")
+		return
+	}
+
+	member, err := h.repo.AddMemberByAccount(c.Request.Context(), operatorID, calendarID, account, req.Role)
+	if err != nil {
+		handleRepoError(c, err, "add member failed")
+		return
+	}
+
+	response.OK(c, member)
 }
 
 func (h *Handler) UpdateMemberRole(c *gin.Context) {
@@ -434,11 +481,13 @@ func buildCalendarParams(c *gin.Context, req calendarRequest) (CreateCalendarPar
 func handleRepoError(c *gin.Context, err error, fallback string) {
 	switch {
 	case IsNotFound(err):
-		response.NotFound(c, "calendar not found or no permission")
+		response.NotFound(c, "用户不存在或日历不存在")
 	case errors.Is(err, ErrNoPermission):
 		response.Forbidden(c, "no permission")
 	case errors.Is(err, ErrCannotManageOwner):
 		response.Fail(c, http.StatusBadRequest, response.CodeCannotRemoveOwner, "cannot manage owner")
+	case errors.Is(err, ErrMemberExists):
+		response.Fail(c, http.StatusBadRequest, response.CodeCannotChangeOwnerRole, "成员已存在")
 	default:
 		response.Internal(c, fallback)
 	}

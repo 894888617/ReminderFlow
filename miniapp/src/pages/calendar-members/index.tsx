@@ -1,9 +1,9 @@
-import { Picker, View } from '@tarojs/components'
+import { Input, Picker, View } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 
 import {
-  createCalendarInvite,
+  addCalendarMember,
   getCalendarDetail,
   listCalendarMembers,
   normalizeCalendarRole,
@@ -56,7 +56,8 @@ export default function CalendarMembersPage() {
   const [members, setMembers] = useState<CalendarMember[]>([])
   const [loading, setLoading] = useState(false)
   const [inviteRole, setInviteRole] = useState<'member' | 'viewer'>('member')
-  const [creatingInvite, setCreatingInvite] = useState(false)
+  const [inviteAccount, setInviteAccount] = useState('')
+  const [addingMember, setAddingMember] = useState(false)
 
   const manageable = canManageMembers(currentRole)
   const currentUser = Taro.getStorageSync('user')
@@ -95,30 +96,46 @@ export default function CalendarMembersPage() {
     loadData()
   })
 
-  const handleCreateInvite = async () => {
-    if (!manageable || creatingInvite) return
+  const handleAddMember = async () => {
+    if (!manageable || addingMember) return
+
+    const account = inviteAccount.trim()
+
+    if (!account) {
+      Taro.showToast({
+        title: '请输入对方账号',
+        icon: 'none',
+      })
+      return
+    }
 
     try {
-      setCreatingInvite(true)
-      Taro.showLoading({ title: '生成中', mask: true })
-      const invite = await createCalendarInvite(calendarId, {
-        role: inviteRole,
-        expire_days: 7,
+      setAddingMember(true)
+
+      Taro.showLoading({
+        title: '添加中',
+        mask: true,
       })
+
+      await addCalendarMember(calendarId, {
+        account,
+        role: inviteRole,
+      })
+
       Taro.hideLoading()
 
-      const sharePath = invite.share_path || `/pages/invite-accept/index?code=${invite.code}`
-      Taro.setClipboardData({
-        data: sharePath,
-        success: () => {
-          Taro.showToast({ title: '邀请链接已复制', icon: 'success' })
-        },
+      Taro.showToast({
+        title: '添加成功',
+        icon: 'success',
       })
+
+      setInviteAccount('')
+      await loadData()
     } catch (err) {
       console.error(err)
       Taro.hideLoading()
     } finally {
-      setCreatingInvite(false)
+      setAddingMember(false)
     }
   }
 
@@ -189,8 +206,54 @@ export default function CalendarMembersPage() {
 
       {manageable && (
         <View className='add-member-card'>
-          <View className='add-member-title'>邀请加入日历</View>
-          <View className='add-member-desc'>生成邀请链接并复制给好友，对方登录后即可加入该日历。</View>
+          <View className='add-member-title'>添加日历成员</View>
+          <View className='add-member-desc'>
+            输入对方账号添加成员。支持用户名、邮箱或微信昵称。
+          </View>
+
+          <View className='member-account-input-wrap'>
+            <Input
+              className='member-account-input'
+              value={inviteAccount}
+              placeholder='请输入对方账号'
+              maxlength={128}
+              onInput={(e) => setInviteAccount(e.detail.value)}
+            />
+
+            <View
+              className='paste-btn'
+              onClick={() => {
+                Taro.getClipboardData({
+                  success: (res) => {
+                    const text = String(res.data || '').trim()
+
+                    if (!text) {
+                      Taro.showToast({
+                        title: '剪贴板为空',
+                        icon: 'none',
+                      })
+                      return
+                    }
+
+                    setInviteAccount(text)
+
+                    Taro.showToast({
+                      title: '已粘贴',
+                      icon: 'success',
+                    })
+                  },
+                  fail: () => {
+                    Taro.showToast({
+                      title: '读取剪贴板失败',
+                      icon: 'none',
+                    })
+                  },
+                })
+              }}
+            >
+              粘贴
+            </View>
+          </View>
 
           <View className='add-member-row'>
             <Picker
@@ -202,12 +265,17 @@ export default function CalendarMembersPage() {
                 if (selected) setInviteRole(selected.value)
               }}
             >
-              <View className={`role-tag ${inviteRole}`}>{roleText(inviteRole)}</View>
+              <View className={`role-tag ${inviteRole}`}>
+                {roleText(inviteRole)}
+              </View>
             </Picker>
           </View>
 
-          <View className={creatingInvite ? 'add-member-btn disabled' : 'add-member-btn'} onClick={handleCreateInvite}>
-            {creatingInvite ? '生成中...' : '生成邀请链接'}
+          <View
+            className={addingMember ? 'add-member-btn disabled' : 'add-member-btn'}
+            onClick={handleAddMember}
+          >
+            {addingMember ? '添加中...' : '添加成员'}
           </View>
         </View>
       )}

@@ -158,6 +158,20 @@ export function createCalendarInvite(
   })
 }
 
+export function addCalendarMember(
+  calendarId: number,
+  data: {
+    account: string
+    role: 'member' | 'viewer'
+  }
+) {
+  return request<CalendarMember>({
+    url: `/api/calendars/${calendarId}/members`,
+    method: 'POST',
+    data,
+  })
+}
+
 export function getInviteDetail(code: string) {
   return request<CalendarInviteDetail>({
     url: `/api/invites/${code}`,
