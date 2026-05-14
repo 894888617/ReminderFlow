@@ -88,7 +88,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		  AND rec.status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
 		ORDER BY rec.due_at ASC
 		LIMIT 100
-		FOR UPDATE SKIP LOCKED
+		FOR UPDATE OF rec SKIP LOCKED
 	`)
 
 	if err != nil {

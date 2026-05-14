@@ -92,7 +92,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		  AND rec.status NOT IN ('DONE', 'CANCELLED')
 		ORDER BY rm.remind_at ASC
 		LIMIT 100
-		FOR UPDATE SKIP LOCKED
+		FOR UPDATE OF rm SKIP LOCKED
 	`)
 
 	if err != nil {
