@@ -216,11 +216,7 @@ func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64
 	if startAt == nil {
 		return nil
 	}
-	checkEnd := endAt
-	fallbackEnd := startAt.Add(time.Hour)
-	if checkEnd == nil || !checkEnd.After(*startAt) {
-		checkEnd = &fallbackEnd
-	}
+	_ = endAt
 	dayStart := time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 0, 0, 0, 0, startAt.Location())
 	dayEnd := dayStart.AddDate(0, 0, 1)
 
@@ -232,7 +228,10 @@ func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64
 		  AND ce.deleted_at IS NULL
 		  AND ce.start_at >= $2
 		  AND ce.start_at < $3
-		  AND LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full')
+		  AND (
+		    LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'full')
+		    OR (LOWER(COALESCE(ce.event_type, 'record')) = 'blocked' AND ce.all_day = true)
+		  )
 	`, calendarID, dayStart, dayEnd).Scan(&blockedCount); err != nil {
 		return err
 	}
@@ -240,23 +239,6 @@ func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64
 		return ErrScheduleConflict
 	}
 
-	var conflictCount int64
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*)
-		FROM calendar_events ce
-		LEFT JOIN records rec ON rec.id = ce.record_id
-		WHERE ce.calendar_id = $1
-		  AND ce.deleted_at IS NULL
-		  AND LOWER(COALESCE(ce.event_type, 'record')) NOT IN ('rest', 'blocked', 'full')
-		  AND LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) NOT IN ('cancelled', 'rest', 'blocked', 'full')
-		  AND ce.start_at < $3
-		  AND COALESCE(ce.end_at, ce.start_at + INTERVAL '1 hour') > $2
-	`, calendarID, startAt, checkEnd).Scan(&conflictCount); err != nil {
-		return err
-	}
-	if conflictCount > 0 {
-		return ErrScheduleConflict
-	}
 	return nil
 }
 

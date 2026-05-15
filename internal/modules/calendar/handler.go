@@ -45,8 +45,11 @@ type updateEventTimeRequest struct {
 }
 
 type createSpecialEventRequest struct {
-	Date string `json:"date"`
-	Type string `json:"type"`
+	Date      string `json:"date"`
+	Type      string `json:"type"`
+	StartTime string `json:"start_time"`
+	AllDay    *bool  `json:"all_day"`
+	Remark    string `json:"remark"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -341,7 +344,26 @@ func (h *Handler) CreateSpecialEvent(c *gin.Context) {
 		return
 	}
 
-	item, err := h.repo.CreateSpecialEvent(c.Request.Context(), userID, calendarID, CreateSpecialEventParams{Date: date, EventType: eventType})
+	startTime := strings.TrimSpace(req.StartTime)
+	if startTime != "" {
+		if _, err := time.Parse("15:04", startTime); err != nil {
+			response.BadRequest(c, "invalid start_time format, use HH:mm")
+			return
+		}
+	}
+
+	allDay := eventType != "blocked" || startTime == ""
+	if req.AllDay != nil {
+		allDay = *req.AllDay
+	}
+
+	item, err := h.repo.CreateSpecialEvent(c.Request.Context(), userID, calendarID, CreateSpecialEventParams{
+		Date:      date,
+		EventType: eventType,
+		StartTime: startTime,
+		AllDay:    allDay,
+		Remark:    strings.TrimSpace(req.Remark),
+	})
 	if err != nil {
 		handleRepoError(c, err, "create special event failed")
 		return

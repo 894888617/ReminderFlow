@@ -83,7 +83,6 @@ export interface CreateRecordParams {
   customer_name?: string;
   customer_phone?: string;
   service_name?: string;
-  remind_at?: string;
 }
 
 export function createRecord(data: CreateRecordParams) {
