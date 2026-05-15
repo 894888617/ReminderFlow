@@ -280,13 +280,6 @@ export default function RecordEditPage() {
   return (
     <View className='container'>
       <View className='edit-header'>
-        <View>
-          <View className='page-title'>编辑记录</View>
-          <View className='page-desc'>
-            修改标题、内容、负责人和截止时间。
-          </View>
-        </View>
-
         <View
           className='back-btn'
           onClick={() => {

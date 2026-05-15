@@ -45,11 +45,13 @@ type updateEventTimeRequest struct {
 }
 
 type createSpecialEventRequest struct {
-	Date      string `json:"date"`
-	Type      string `json:"type"`
-	StartTime string `json:"start_time"`
-	AllDay    *bool  `json:"all_day"`
-	Remark    string `json:"remark"`
+	Date       string `json:"date"`
+	Type       string `json:"type"`
+	AssigneeID int64  `json:"assignee_id"`
+	StartTime  string `json:"start_time"`
+	EndTime    string `json:"end_time"`
+	AllDay     *bool  `json:"all_day"`
+	Remark     string `json:"remark"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -344,25 +346,44 @@ func (h *Handler) CreateSpecialEvent(c *gin.Context) {
 		return
 	}
 
+	if req.AssigneeID <= 0 {
+		response.BadRequest(c, "assignee_id required")
+		return
+	}
+
 	startTime := strings.TrimSpace(req.StartTime)
-	if startTime != "" {
-		if _, err := time.Parse("15:04", startTime); err != nil {
+	endTime := strings.TrimSpace(req.EndTime)
+	if eventType == "blocked" {
+		if startTime == "" || endTime == "" {
+			response.BadRequest(c, "start_time and end_time required")
+			return
+		}
+		parsedStart, err := time.Parse("15:04", startTime)
+		if err != nil {
 			response.BadRequest(c, "invalid start_time format, use HH:mm")
+			return
+		}
+		parsedEnd, err := time.Parse("15:04", endTime)
+		if err != nil {
+			response.BadRequest(c, "invalid end_time format, use HH:mm")
+			return
+		}
+		if !parsedEnd.After(parsedStart) {
+			response.BadRequest(c, "end_time must be after start_time")
 			return
 		}
 	}
 
-	allDay := eventType != "blocked" || startTime == ""
-	if req.AllDay != nil {
-		allDay = *req.AllDay
-	}
+	allDay := eventType != "blocked"
 
 	item, err := h.repo.CreateSpecialEvent(c.Request.Context(), userID, calendarID, CreateSpecialEventParams{
-		Date:      date,
-		EventType: eventType,
-		StartTime: startTime,
-		AllDay:    allDay,
-		Remark:    strings.TrimSpace(req.Remark),
+		Date:       date,
+		EventType:  eventType,
+		AssigneeID: req.AssigneeID,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		AllDay:     allDay,
+		Remark:     strings.TrimSpace(req.Remark),
 	})
 	if err != nil {
 		handleRepoError(c, err, "create special event failed")

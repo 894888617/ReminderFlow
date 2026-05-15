@@ -82,11 +82,13 @@ type CalendarEventFilters struct {
 }
 
 type CreateSpecialEventParams struct {
-	Date      time.Time
-	EventType string
-	StartTime string
-	AllDay    bool
-	Remark    string
+	Date       time.Time
+	EventType  string
+	AssigneeID int64
+	StartTime  string
+	EndTime    string
+	AllDay     bool
+	Remark     string
 }
 
 type MonthlyStats struct {

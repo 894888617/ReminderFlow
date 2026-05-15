@@ -151,13 +151,6 @@ export default function NotificationPage() {
   return (
     <View className='container'>
       <View className='notification-header'>
-        <View>
-          <View className='page-title'>通知中心</View>
-          <View className='page-desc'>
-            未读通知 {unreadCount} 条
-          </View>
-        </View>
-
         <PageRefresh onClick={loadData} />
       </View>
 

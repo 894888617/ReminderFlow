@@ -195,10 +195,6 @@ export default function CalendarMembersPage() {
   return (
     <View className='container'>
       <View className='members-header'>
-        <View>
-          <View className='page-title'>日历成员</View>
-          <View className='page-desc'>{calendarName || '共享日历'} ｜ 共 {members.length} 人</View>
-        </View>
         <PageRefresh onClick={loadData} />
       </View>
 

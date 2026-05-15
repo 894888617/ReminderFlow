@@ -2,26 +2,6 @@
   min-height: 100vh;
 }
 
-.special-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.special-title {
-  font-size: 40px;
-  font-weight: 900;
-  color: #111827;
-  margin-bottom: 10px;
-}
-
-.special-subtitle {
-  font-size: 24px;
-  color: #6b7280;
-  line-height: 1.5;
-}
-
 .form-card {
   background: #ffffff;
   border-radius: 22px;
@@ -95,12 +75,6 @@
   box-sizing: border-box;
 }
 
-.clear-time {
-  margin-top: 12px;
-  font-size: 23px;
-  color: #1677ff;
-  font-weight: 700;
-}
 
 .submit-btn {
   background: #1677ff;

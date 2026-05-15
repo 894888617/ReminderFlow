@@ -81,13 +81,6 @@ export default function HomePage() {
 
   return (
     <View className='container'>
-      <View className='home-header'>
-        <View>
-          <View className='page-title'>首页</View>
-          <View className='page-desc'>查看今日待办、逾期任务和最新通知。</View>
-        </View>
-      </View>
-
       <View className='summary-grid'>
         <View className='summary-card'>
           <Text className='summary-value'>{data?.today_due_count || 0}</Text>

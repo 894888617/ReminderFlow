@@ -1,18 +1,21 @@
-import { View, Text, Input, Textarea, Picker } from "@tarojs/components";
-import Taro, { useRouter } from "@tarojs/taro";
+import { View, Text, Textarea, Picker } from "@tarojs/components";
+import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useMemo, useState } from "react";
 
 import {
   createSpecialCalendarEvent,
+  listCalendarMembers,
+  type CalendarMember,
   type SpecialDayType,
 } from "../../api/calendar";
+import { getUserNameDisplay } from "../../utils/userDisplay";
 
 import "./index.scss";
 
-const typeMeta: Record<SpecialDayType, { label: string; hint: string }> = {
-  rest: { label: "休息", hint: "全天休息，可补充备注说明。" },
-  blocked: { label: "不接", hint: "可选择开始时间；留空表示当天不接。" },
-  full: { label: "已满", hint: "当天预约已满，可补充备注说明。" },
+const typeMeta: Record<SpecialDayType, { label: string }> = {
+  rest: { label: "休息" },
+  blocked: { label: "不接" },
+  full: { label: "已满" },
 };
 
 function isSpecialDayType(value: string): value is SpecialDayType {
@@ -26,11 +29,42 @@ export default function ScheduleSpecialPage() {
   const rawType = String(router.params.type || "rest");
   const type: SpecialDayType = isSpecialDayType(rawType) ? rawType : "rest";
 
+  const initialAssigneeId = Number(router.params.assignee_id || 0);
+
+  const [members, setMembers] = useState<CalendarMember[]>([]);
+  const [assigneeId, setAssigneeId] = useState(initialAssigneeId);
   const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [remark, setRemark] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const meta = useMemo(() => typeMeta[type], [type]);
+  const memberOptions = useMemo(
+    () =>
+      members.map((item) => ({
+        label: getUserNameDisplay(item),
+        value: item.user_id,
+      })),
+    [members],
+  );
+  const assigneeIndex = Math.max(
+    0,
+    memberOptions.findIndex((item) => item.value === assigneeId),
+  );
+
+  useDidShow(() => {
+    if (!calendarId) return;
+    listCalendarMembers(calendarId)
+      .then((items) => {
+        const list = items || [];
+        setMembers(list);
+        if (!assigneeId && list[0]?.user_id) setAssigneeId(list[0].user_id);
+      })
+      .catch((err) => {
+        console.error(err);
+        Taro.showToast({ title: "负责人加载失败", icon: "none" });
+      });
+  });
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -40,6 +74,26 @@ export default function ScheduleSpecialPage() {
       return;
     }
 
+    if (!assigneeId) {
+      Taro.showToast({ title: "请选择负责人", icon: "none" });
+      return;
+    }
+
+    if (type === "blocked") {
+      if (!startTime) {
+        Taro.showToast({ title: "请选择开始时间", icon: "none" });
+        return;
+      }
+      if (!endTime) {
+        Taro.showToast({ title: "请选择结束时间", icon: "none" });
+        return;
+      }
+      if (endTime <= startTime) {
+        Taro.showToast({ title: "结束时间必须晚于开始时间", icon: "none" });
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
       Taro.showLoading({ title: "保存中", mask: true });
@@ -47,8 +101,10 @@ export default function ScheduleSpecialPage() {
       await createSpecialCalendarEvent(calendarId, {
         date: selectedDate,
         type,
-        start_time: type === "blocked" && startTime ? startTime : undefined,
-        all_day: type !== "blocked" || !startTime,
+        assignee_id: assigneeId,
+        start_time: type === "blocked" ? startTime : undefined,
+        end_time: type === "blocked" ? endTime : undefined,
+        all_day: type !== "blocked",
         remark: remark.trim() || undefined,
       });
 
@@ -76,13 +132,6 @@ export default function ScheduleSpecialPage() {
 
   return (
     <View className="container special-container">
-      <View className="special-header">
-        <View>
-          <View className="special-title">设置{meta.label}</View>
-          <View className="special-subtitle">{meta.hint}</View>
-        </View>
-      </View>
-
       <View className="form-card">
         <View className="form-item">
           <Text className="form-label">日期</Text>
@@ -93,23 +142,51 @@ export default function ScheduleSpecialPage() {
           <Text className="form-label">类型</Text>
           <View className={`type-pill type-${type}`}>{meta.label}</View>
         </View>
+        <View className="form-item">
+          <Text className="form-label">负责人</Text>
+          <Picker
+            mode="selector"
+            range={memberOptions.map((item) => item.label)}
+            value={assigneeIndex}
+            disabled={memberOptions.length === 0}
+            onChange={(e) => {
+              const selected = memberOptions[Number(e.detail.value)];
+              if (selected) setAssigneeId(selected.value);
+            }}
+          >
+            <View className="readonly-value">
+              {memberOptions[assigneeIndex]?.label || "请选择负责人"}
+            </View>
+          </Picker>
+        </View>
 
         {type === "blocked" ? (
-          <View className="form-item">
-            <Text className="form-label">开始时间（可选）</Text>
-            <Picker
-              mode="time"
-              value={startTime || "10:00"}
-              onChange={(e) => setStartTime(String(e.detail.value))}
-            >
-              <View className="datetime-picker">
-                {startTime || "选择开始时间"}
-              </View>
-            </Picker>
-            {startTime ? (
-              <View className="clear-time" onClick={() => setStartTime("")}>清除开始时间</View>
-            ) : null}
-          </View>
+          <>
+            <View className="form-item">
+              <Text className="form-label">开始时间</Text>
+              <Picker
+                mode="time"
+                value={startTime || "10:00"}
+                onChange={(e) => setStartTime(String(e.detail.value))}
+              >
+                <View className="datetime-picker">
+                  {startTime || "选择开始时间"}
+                </View>
+              </Picker>
+            </View>
+            <View className="form-item">
+              <Text className="form-label">结束时间</Text>
+              <Picker
+                mode="time"
+                value={endTime || "12:00"}
+                onChange={(e) => setEndTime(String(e.detail.value))}
+              >
+                <View className="datetime-picker">
+                  {endTime || "选择结束时间"}
+                </View>
+              </Picker>
+            </View>
+          </>
         ) : (
           <View className="form-item">
             <Text className="form-label">是否全天</Text>

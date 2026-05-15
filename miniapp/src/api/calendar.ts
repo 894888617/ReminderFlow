@@ -230,7 +230,9 @@ export type SpecialDayType = "rest" | "blocked" | "full";
 export interface CreateSpecialCalendarEventParams {
   date: string;
   type: SpecialDayType;
+  assignee_id: number;
   start_time?: string;
+  end_time?: string;
   all_day?: boolean;
   remark?: string;
 }
@@ -243,6 +245,13 @@ export function createSpecialCalendarEvent(
     url: `/api/calendars/${calendarId}/events/special`,
     method: "POST",
     data,
+  });
+}
+
+export function deleteCalendarEvent(eventId: number) {
+  return request({
+    url: `/api/calendar-events/${eventId}`,
+    method: "DELETE",
   });
 }
 

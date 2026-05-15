@@ -319,11 +319,6 @@ export default function RecordDetailPage() {
   return (
     <View className='container'>
       <View className='detail-header'>
-        <View>
-          <View className='page-title'>{record.title}</View>
-          <View className='page-desc'>记录 ID：{record.id}</View>
-        </View>
-
         <View className='header-actions'>
           {editable && (
             <View
