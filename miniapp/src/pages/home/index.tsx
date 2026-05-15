@@ -86,20 +86,6 @@ export default function HomePage() {
           <View className='page-title'>首页</View>
           <View className='page-desc'>查看今日待办、逾期任务和最新通知。</View>
         </View>
-
-        <View
-          className='notice-entry'
-          onClick={() => {
-            Taro.switchTab({
-              url: '/pages/notification/index',
-            })
-          }}
-        >
-          通知
-          {(data?.unread_notification_count || 0) > 0 && (
-            <Text className='notice-badge'>{data?.unread_notification_count}</Text>
-          )}
-        </View>
       </View>
 
       <View className='summary-grid'>
@@ -153,7 +139,7 @@ export default function HomePage() {
               <View
                 className='newbie-secondary-btn'
                 onClick={() => {
-                  Taro.switchTab({
+                  Taro.redirectTo({
                     url: '/pages/calendar/index',
                   })
                 }}
@@ -178,7 +164,7 @@ export default function HomePage() {
             <View
               className='newbie-secondary-btn'
               onClick={() => {
-                Taro.switchTab({
+                Taro.redirectTo({
                   url: '/pages/calendar/index',
                 })
               }}

@@ -127,7 +127,7 @@ export default function CalendarDetailPage() {
           await deleteCalendar(calendarId)
           Taro.hideLoading()
           Taro.showToast({ title: '删除成功', icon: 'success' })
-          setTimeout(() => Taro.switchTab({ url: '/pages/calendar/index' }), 500)
+          setTimeout(() => Taro.redirectTo({ url: '/pages/calendar/index' }), 500)
         } catch (err) {
           console.error(err)
           Taro.hideLoading()
@@ -170,7 +170,7 @@ export default function CalendarDetailPage() {
       </View>
 
       <View className='detail-actions'>
-        <View className='action-btn' onClick={() => { Taro.setStorageSync('selected_calendar_id', calendarId); Taro.switchTab({ url: '/pages/calendar/index' }) }}>进入日历</View>
+        <View className='action-btn' onClick={() => { Taro.setStorageSync('selected_calendar_id', calendarId); Taro.redirectTo({ url: '/pages/calendar/index' }) }}>进入日历</View>
         {writable && <View className='action-btn' onClick={() => Taro.navigateTo({ url: `/pages/record-create/index?calendar_id=${calendarId}` })}>新建记录</View>}
         {showMembers && <View className='action-btn green' onClick={() => Taro.navigateTo({ url: `/pages/calendar-members/index?calendar_id=${calendarId}` })}>日历成员</View>}
       </View>

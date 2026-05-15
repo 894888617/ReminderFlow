@@ -62,8 +62,8 @@ export default function InviteAcceptPage() {
 
   const redirectToCalendar = (calendarId: number) => {
     Taro.setStorageSync('selected_calendar_id', calendarId)
-    Taro.switchTab({
-      url: '/pages/calendar/index',
+    Taro.redirectTo({
+      url: `/pages/calendar/index?calendar_id=${calendarId}`,
     })
   }
 
