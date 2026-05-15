@@ -44,6 +44,11 @@ type updateEventTimeRequest struct {
 	AllDay  bool    `json:"all_day"`
 }
 
+type createSpecialEventRequest struct {
+	Date string `json:"date"`
+	Type string `json:"type"`
+}
+
 func (h *Handler) Create(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -293,13 +298,98 @@ func (h *Handler) ListEvents(c *gin.Context) {
 		return
 	}
 
-	items, err := h.repo.ListCalendarEvents(c.Request.Context(), userID, calendarID, startAt, endAt)
+	filters, ok := parseEventFilters(c)
+	if !ok {
+		return
+	}
+
+	items, err := h.repo.ListCalendarEvents(c.Request.Context(), userID, calendarID, startAt, endAt, filters)
 	if err != nil {
 		handleRepoError(c, err, "query calendar events failed")
 		return
 	}
 
 	response.OK(c, gin.H{"items": items})
+}
+
+func (h *Handler) CreateSpecialEvent(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
+		return
+	}
+
+	var req createSpecialEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid request")
+		return
+	}
+
+	eventType := strings.ToLower(strings.TrimSpace(req.Type))
+	if eventType != "rest" && eventType != "blocked" && eventType != "full" {
+		response.BadRequest(c, "invalid special event type")
+		return
+	}
+
+	date, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(req.Date), shanghaiLocation())
+	if err != nil {
+		response.BadRequest(c, "invalid date format, use YYYY-MM-DD")
+		return
+	}
+
+	item, err := h.repo.CreateSpecialEvent(c.Request.Context(), userID, calendarID, CreateSpecialEventParams{Date: date, EventType: eventType})
+	if err != nil {
+		handleRepoError(c, err, "create special event failed")
+		return
+	}
+
+	response.OK(c, item)
+}
+
+func (h *Handler) MonthlyStats(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
+		return
+	}
+	month, startAt, endAt, ok := parseMonth(c)
+	if !ok {
+		return
+	}
+	stats, err := h.repo.MonthlyStats(c.Request.Context(), userID, calendarID, month, startAt, endAt)
+	if err != nil {
+		handleRepoError(c, err, "query monthly stats failed")
+		return
+	}
+	response.OK(c, stats)
+}
+
+func (h *Handler) MemberWorkloadStats(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+	calendarID, ok := parseCalendarID(c)
+	if !ok {
+		return
+	}
+	month, startAt, endAt, ok := parseMonth(c)
+	if !ok {
+		return
+	}
+	stats, err := h.repo.MemberWorkloadStats(c.Request.Context(), userID, calendarID, month, startAt, endAt)
+	if err != nil {
+		handleRepoError(c, err, "query member workload failed")
+		return
+	}
+	response.OK(c, stats)
 }
 
 func (h *Handler) UpdateEventTime(c *gin.Context) {
@@ -376,6 +466,43 @@ func parseEventID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return eventID, true
+}
+
+func parseEventFilters(c *gin.Context) (CalendarEventFilters, bool) {
+	filters := CalendarEventFilters{
+		Status:    strings.ToLower(strings.TrimSpace(c.Query("status"))),
+		EventType: strings.ToLower(strings.TrimSpace(c.Query("event_type"))),
+	}
+	if text := strings.TrimSpace(c.Query("assignee_id")); text != "" {
+		id, err := strconv.ParseInt(text, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "invalid assignee_id")
+			return CalendarEventFilters{}, false
+		}
+		filters.AssigneeID = &id
+	}
+	return filters, true
+}
+
+func parseMonth(c *gin.Context) (string, time.Time, time.Time, bool) {
+	month := strings.TrimSpace(c.Query("month"))
+	if month == "" {
+		month = time.Now().In(shanghaiLocation()).Format("2006-01")
+	}
+	startAt, err := time.ParseInLocation("2006-01", month, shanghaiLocation())
+	if err != nil {
+		response.BadRequest(c, "invalid month format, use YYYY-MM")
+		return "", time.Time{}, time.Time{}, false
+	}
+	return month, startAt, startAt.AddDate(0, 1, 0), true
+}
+
+func shanghaiLocation() *time.Location {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	return loc
 }
 
 func parseDateRange(c *gin.Context) (time.Time, time.Time, bool) {

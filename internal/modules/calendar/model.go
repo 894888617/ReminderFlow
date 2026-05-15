@@ -52,6 +52,7 @@ type UpdateCalendarParams struct {
 }
 
 type CalendarEvent struct {
+	ID              int64   `json:"id"`
 	EventID         int64   `json:"event_id"`
 	CalendarID      int64   `json:"calendar_id"`
 	RecordID        *int64  `json:"record_id"`
@@ -59,6 +60,7 @@ type CalendarEvent struct {
 	RecordTitle     string  `json:"record_title"`
 	RecordContent   string  `json:"record_content"`
 	Status          string  `json:"status"`
+	EventType       string  `json:"event_type"`
 	AssigneeID      *int64  `json:"assignee_id"`
 	AssigneeName    string  `json:"assignee_name"`
 	StartAt         string  `json:"start_at"`
@@ -71,4 +73,40 @@ type CalendarEventTimeParams struct {
 	StartAt time.Time
 	EndAt   *time.Time
 	AllDay  bool
+}
+
+type CalendarEventFilters struct {
+	AssigneeID *int64
+	Status     string
+	EventType  string
+}
+
+type CreateSpecialEventParams struct {
+	Date      time.Time
+	EventType string
+}
+
+type MonthlyStats struct {
+	Month     string `json:"month"`
+	Total     int64  `json:"total"`
+	Pending   int64  `json:"pending"`
+	Confirmed int64  `json:"confirmed"`
+	Done      int64  `json:"done"`
+	Cancelled int64  `json:"cancelled"`
+	RestDays  int64  `json:"rest_days"`
+	FullDays  int64  `json:"full_days"`
+}
+
+type MemberWorkloadItem struct {
+	UserID    int64  `json:"user_id"`
+	Name      string `json:"name"`
+	Total     int64  `json:"total"`
+	Done      int64  `json:"done"`
+	Cancelled int64  `json:"cancelled"`
+	Pending   int64  `json:"pending"`
+}
+
+type MemberWorkloadStats struct {
+	Month string               `json:"month"`
+	Items []MemberWorkloadItem `json:"items"`
 }
