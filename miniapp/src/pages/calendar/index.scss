@@ -37,6 +37,16 @@
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
+.nav-calendar-name {
+  max-width: 180rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
 .nav-actions-center {
   position: absolute;
   left: 50%;

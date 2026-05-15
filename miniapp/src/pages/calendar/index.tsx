@@ -544,7 +544,9 @@ export default function CalendarPage() {
           }}
         >
           <View className="nav-calendar-pill">
-            当前日历 {selectedCalendar?.name || "选择日历"}
+            <Text className="nav-calendar-name">
+              {selectedCalendar?.name || '选择日历'}
+            </Text>
           </View>
         </Picker>
 
