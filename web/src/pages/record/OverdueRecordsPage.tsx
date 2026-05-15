@@ -7,27 +7,11 @@ import dayjs from "dayjs";
 
 import { getOverdueRecords, updateRecordStatus } from "../../api/record";
 import type { RecordItem, RecordStatus } from "../../types/record";
+import { recordStatusColor, recordStatusText } from "../../utils/recordStatus";
 
 const { Title, Text } = Typography;
 
-function statusColor(status: RecordStatus) {
-    if (status === "OVERDUE") return "error";
-    if (status === "DONE") return "success";
-    if (status === "IN_PROGRESS") return "processing";
-    if (status === "CANCELLED") return "warning";
-    return "default";
-}
 
-function statusText(status: RecordStatus) {
-    const map: Record<RecordStatus, string> = {
-        PENDING: "待处理",
-        IN_PROGRESS: "进行中",
-        DONE: "已完成",
-        OVERDUE: "已逾期",
-        CANCELLED: "已取消",
-    };
-    return map[status] || status;
-}
 
 export default function OverdueRecordsPage() {
     const navigate = useNavigate();
@@ -52,7 +36,7 @@ export default function OverdueRecordsPage() {
     }, []);
 
     const handleDone = async (record: RecordItem) => {
-        await updateRecordStatus(record.id, "DONE");
+        await updateRecordStatus(record.id, "COMPLETED");
         await loadData();
     };
 
@@ -80,7 +64,7 @@ export default function OverdueRecordsPage() {
             key: "status",
             width: 120,
             render: (status: RecordStatus) => (
-                <Tag color={statusColor(status)}>{statusText(status)}</Tag>
+                <Tag color={recordStatusColor(status)}>{recordStatusText(status)}</Tag>
             ),
         },
         {

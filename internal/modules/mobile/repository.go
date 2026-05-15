@@ -63,7 +63,7 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		  AND rec.assignee_id = $1
 		  AND rec.due_at >= $2
 		  AND rec.due_at < $3
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 	`, userID, todayStart, tomorrowStart).Scan(&result.TodayDueCount); err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		WHERE cm.user_id = $1
 		  AND cm.status = 'active'
 		  AND rec.assignee_id = $1
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 	`, userID).Scan(&result.UnfinishedCount); err != nil {
 		return nil, err
 	}
@@ -101,7 +101,9 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		WHERE cm.user_id = $1
 		  AND cm.status = 'active'
 		  AND rec.assignee_id = $1
-		  AND rec.status = 'OVERDUE'
+		  AND rec.due_at IS NOT NULL
+		  AND rec.due_at < NOW()
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 	`, userID).Scan(&result.OverdueCount); err != nil {
 		return nil, err
 	}
@@ -169,9 +171,9 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		WHERE cm.user_id = $1
 		  AND cm.status = 'active'
 		  AND rec.assignee_id = $1
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		ORDER BY
-			CASE WHEN rec.status = 'OVERDUE' THEN 1 ELSE 2 END,
+			CASE WHEN rec.due_at IS NOT NULL AND rec.due_at < NOW() THEN 1 ELSE 2 END,
 			CASE WHEN rec.due_at IS NULL THEN 1 ELSE 0 END,
 			rec.due_at ASC,
 			rec.created_at DESC

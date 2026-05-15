@@ -1,3 +1,4 @@
+import { normalizeRecordStatus } from "../utils/recordStatus";
 import { request } from "./request";
 
 export type CalendarRole = "owner" | "member" | "viewer";
@@ -67,6 +68,15 @@ export interface CalendarEvent {
   creator_id?: number;
   assignee_id?: number | null;
   assignee_name?: string;
+}
+
+function normalizeCalendarEvent(item: CalendarEvent): CalendarEvent {
+  const eventType = String(item.event_type || '').toLowerCase();
+  if (["rest", "blocked", "full"].includes(eventType)) return item;
+  return {
+    ...item,
+    status: normalizeRecordStatus(item.status),
+  };
 }
 
 export interface CreateCalendarParams {
@@ -222,7 +232,10 @@ export function listCalendarEvents(
   return request<{ items: CalendarEvent[] }>({
     url: `/api/calendars/${calendarId}/events?${query}`,
     method: "GET",
-  });
+  }).then((data) => ({
+    ...data,
+    items: (data.items || []).map(normalizeCalendarEvent),
+  }));
 }
 
 export type SpecialDayType = "rest" | "blocked" | "full";
@@ -259,8 +272,7 @@ export interface MonthlyCalendarStats {
   month: string;
   total: number;
   pending: number;
-  confirmed: number;
-  done: number;
+  completed: number;
   cancelled: number;
   rest_days: number;
   full_days: number;
@@ -270,7 +282,7 @@ export interface MemberWorkloadItem {
   user_id: number;
   name: string;
   total: number;
-  done: number;
+  completed: number;
   cancelled: number;
   pending: number;
 }

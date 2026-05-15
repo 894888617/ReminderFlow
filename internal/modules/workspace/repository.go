@@ -304,7 +304,7 @@ func (r *Repository) CountUnfinishedRecordsByAssignee(ctx context.Context, works
 		FROM records
 		WHERE workspace_id = $1
 		  AND assignee_id = $2
-		  AND status NOT IN ('DONE', 'CANCELLED')
+		  AND status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 	`, workspaceID, userID).Scan(&count)
 
 	return count, err

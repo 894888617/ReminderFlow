@@ -65,7 +65,7 @@ func (r *Repository) ListDueToday(ctx context.Context, userID int64, start, end 
 		  AND rec.assignee_id = $1
 		  AND rec.due_at >= $2
 		  AND rec.due_at < $3
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		ORDER BY rec.due_at ASC, rec.created_at DESC
 	`, userID, start, end)
 
@@ -182,7 +182,7 @@ func (r *Repository) ListUnfinished(ctx context.Context, userID int64) ([]TodoRe
 		WHERE wm.status = 'active'
 		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		ORDER BY 
 			CASE 
 				WHEN rec.due_at IS NULL THEN 1 

@@ -345,14 +345,13 @@
   color: #2563eb;
 }
 
-.status-DONE {
-  background: #dcfce7;
-  color: #16a34a;
+.record-status.editable {
+  border: 1px solid currentColor;
 }
 
-.status-IN_PROGRESS {
-  background: #e0f2fe;
-  color: #0284c7;
+.status-COMPLETED {
+  background: #dcfce7;
+  color: #16a34a;
 }
 
 .status-PENDING {
@@ -360,10 +359,6 @@
   color: #6b7280;
 }
 
-.status-OVERDUE {
-  background: #fee2e2;
-  color: #dc2626;
-}
 
 .status-CANCELLED {
   background: #f1f5f9;
@@ -575,16 +570,7 @@
   color: #be185d;
 }
 
-.status-confirmed,
-.status-in_progress,
-.status-IN_PROGRESS {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-.status-done,
-.status-completed,
-.status-DONE {
+.status-COMPLETED {
   background: #dcfce7;
   color: #16a34a;
 }
@@ -593,12 +579,6 @@
 .status-CANCELLED {
   background: #f1f5f9;
   color: #64748b;
-}
-
-.status-overdue,
-.status-OVERDUE {
-  background: #fee2e2;
-  color: #dc2626;
 }
 
 .status-rest {

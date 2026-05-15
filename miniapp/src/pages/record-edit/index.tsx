@@ -6,6 +6,7 @@ import {
   deleteRecord,
   getRecordDetail,
   updateRecord,
+  updateRecordStatus,
   type RecordItem,
 } from '../../api/record'
 import {
@@ -19,6 +20,7 @@ import {
 
 import { getStoredToken } from '../../utils/auth'
 import { getUserNameDisplay } from '../../utils/userDisplay'
+import { normalizeRecordStatus, RECORD_STATUS_OPTIONS, type RecordStatus } from '../../utils/recordStatus'
 import './index.scss'
 
 function buildDateTime(date: string, time: string) {
@@ -74,6 +76,7 @@ export default function RecordEditPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [assigneeId, setAssigneeId] = useState<number | undefined>()
+  const [status, setStatus] = useState<RecordStatus>('PENDING')
 
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
@@ -98,6 +101,10 @@ export default function RecordEditPage() {
     const selected = memberOptions.find((item) => item.value === assigneeId)
     return selected?.label || '未分配'
   }, [memberOptions, assigneeId])
+
+  const statusIndex = useMemo(() => {
+    return Math.max(0, RECORD_STATUS_OPTIONS.findIndex((item) => item.value === status))
+  }, [status])
 
   const loadData = async () => {
     const token = getStoredToken()
@@ -129,6 +136,7 @@ export default function RecordEditPage() {
       setTitle(detail.title || '')
       setContent(detail.content || '')
       setAssigneeId(detail.assignee_id || undefined)
+      setStatus(normalizeRecordStatus(detail.status))
 
       const due = splitDateTime(detail.due_at)
       setDueDate(due.date)
@@ -199,6 +207,10 @@ export default function RecordEditPage() {
         assignee_id: assigneeId,
         due_at: dueAt,
       })
+
+      if (record && status !== normalizeRecordStatus(record.status)) {
+        await updateRecordStatus(recordId, status)
+      }
 
       Taro.hideLoading()
 
@@ -354,6 +366,23 @@ export default function RecordEditPage() {
               清除负责人
             </View>
           )}
+        </View>
+
+        <View className='form-item'>
+          <Text className='form-label'>状态</Text>
+          <Picker
+            mode='selector'
+            range={RECORD_STATUS_OPTIONS.map((item) => item.label)}
+            value={statusIndex}
+            onChange={(e) => {
+              const nextStatus = RECORD_STATUS_OPTIONS[Number(e.detail.value)]?.value
+              if (nextStatus) setStatus(nextStatus)
+            }}
+          >
+            <View className='picker-value'>
+              {RECORD_STATUS_OPTIONS[statusIndex].label}
+            </View>
+          </Picker>
         </View>
 
         <View className='form-item'>

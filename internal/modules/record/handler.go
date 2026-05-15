@@ -159,7 +159,7 @@ func (h *Handler) Create(c *gin.Context) {
 		CalendarEndAt:     calendarEndAt,
 		CalendarAllDay:    calendarAllDay,
 		RemindAt:          remindAt,
-		AppointmentStatus: strings.ToLower(strings.TrimSpace(req.AppointmentStatus)),
+		AppointmentStatus: strings.ToLower(NormalizeRecordStatus(req.AppointmentStatus)),
 		CustomerName:      req.CustomerName,
 		CustomerPhone:     req.CustomerPhone,
 		ServiceName:       req.ServiceName,
@@ -571,7 +571,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	req.Status = strings.ToUpper(strings.TrimSpace(req.Status))
+	req.Status = NormalizeRecordStatus(req.Status)
 
 	if !IsValidStatus(req.Status) {
 		response.BadRequest(c, "invalid status")

@@ -89,7 +89,7 @@ func (s *ReminderScheduler) ScanDueReminders(ctx context.Context) error {
 		LEFT JOIN calendars c ON c.id = rec.calendar_id
 		WHERE rm.notified = false 
 		  AND rm.remind_at <= NOW()
-		  AND rec.status NOT IN ('DONE', 'CANCELLED')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		ORDER BY rm.remind_at ASC
 		LIMIT 100
 		FOR UPDATE OF rm SKIP LOCKED

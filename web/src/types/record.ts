@@ -1,9 +1,4 @@
-export type RecordStatus =
-    | "PENDING"
-    | "IN_PROGRESS"
-    | "DONE"
-    | "OVERDUE"
-    | "CANCELLED";
+export type RecordStatus = "PENDING" | "COMPLETED" | "CANCELLED";
 
 export interface RecordItem {
     id: number;

@@ -16,43 +16,10 @@ import dayjs from "dayjs";
 
 import { getTodayTodos } from "../../api/todo";
 import type { RecordItem, RecordStatus } from "../../types/record";
+import { recordStatusColor, recordStatusText } from "../../utils/recordStatus";
 import type { TodoReminder, TodayTodoResult } from "../../types/todo";
 
 const { Title, Text } = Typography;
-
-function statusText(status: RecordStatus) {
-    switch (status) {
-        case "PENDING":
-            return "待处理";
-        case "IN_PROGRESS":
-            return "进行中";
-        case "DONE":
-            return "已完成";
-        case "OVERDUE":
-            return "已逾期";
-        case "CANCELLED":
-            return "已取消";
-        default:
-            return status;
-    }
-}
-
-function statusColor(status: RecordStatus) {
-    switch (status) {
-        case "PENDING":
-            return "default";
-        case "IN_PROGRESS":
-            return "processing";
-        case "DONE":
-            return "success";
-        case "OVERDUE":
-            return "error";
-        case "CANCELLED":
-            return "warning";
-        default:
-            return "default";
-    }
-}
 
 function repeatTypeText(type: string) {
     switch (type) {
@@ -115,7 +82,7 @@ export default function TodayTodoPage() {
             key: "status",
             width: 120,
             render: (status: RecordStatus) => (
-                <Tag color={statusColor(status)}>{statusText(status)}</Tag>
+                <Tag color={recordStatusColor(status)}>{recordStatusText(status)}</Tag>
             ),
         },
         {
