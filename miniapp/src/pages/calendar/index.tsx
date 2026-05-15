@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 
 import {
   createSpecialCalendarEvent,
-  deleteCalendar,
   getMemberWorkloadStats,
   getMonthlyCalendarStats,
   listCalendarEvents,
@@ -17,9 +16,12 @@ import {
   type MemberWorkloadItem,
   type MonthlyCalendarStats,
 } from "../../api/calendar";
-import { canCreateRecord, canViewMembers } from "../../utils/permission";
+import { canCreateRecord } from "../../utils/permission";
 import { getStoredToken, getStoredUser } from "../../utils/auth";
-import { getUserNameDisplay, getWechatDisplayName } from "../../utils/userDisplay";
+import {
+  getUserNameDisplay,
+  getWechatDisplayName,
+} from "../../utils/userDisplay";
 
 import "./index.scss";
 
@@ -152,7 +154,6 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string>(initialSelectedDate);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [monthlyStats, setMonthlyStats] = useState<MonthlyCalendarStats | null>(
@@ -166,7 +167,7 @@ export default function CalendarPage() {
   );
   const currentUserRole = normalizeCalendarRole(selectedCalendar);
   const writable = canCreateRecord(currentUserRole);
-  const showMembers = canViewMembers(currentUserRole);
+  const canUseCalendarActions = writable;
 
   const calendarNames = useMemo(
     () => calendars.map((item) => item.name),
@@ -218,7 +219,8 @@ export default function CalendarPage() {
   const navTitle = selectedCalendar?.name || "客户预约";
   const accountName = getWechatDisplayName(currentUser);
   const accountText = accountName && accountName !== "-" ? accountName : "我的";
-  const accountAvatarText = accountText === "我的" ? "我" : accountText.slice(0, 1);
+  const accountAvatarText =
+    accountText === "我的" ? "我" : accountText.slice(0, 1);
 
   const loadMembers = async (calendarId: number) => {
     if (!calendarId) {
@@ -389,42 +391,63 @@ export default function CalendarPage() {
 
   const renderCustomNav = () => (
     <View className="custom-nav">
-      <View className="nav-title">{navTitle}</View>
-      <View className="nav-account" onClick={goProfile}>
-        <View className="nav-account-avatar">{accountAvatarText}</View>
-        <View className="nav-account-text">{accountText}</View>
+      <View className="nav-main-row">
+        <Picker
+          mode="selector"
+          range={calendarNames}
+          value={selectedCalendarIndex >= 0 ? selectedCalendarIndex : 0}
+          disabled={calendars.length === 0}
+          onChange={(e) => {
+            const selected = calendars[Number(e.detail.value)];
+            if (selected) changeCalendar(selected.id);
+          }}
+        >
+          <View className="nav-calendar-name">
+            <Text className="nav-calendar-label">当前日历</Text>
+            <Text className="nav-calendar-text">{navTitle}</Text>
+            <Text className="nav-calendar-arrow">⌄</Text>
+          </View>
+        </Picker>
+        <View className="nav-account" onClick={goProfile}>
+          <View className="nav-account-avatar">{accountAvatarText}</View>
+          <View className="nav-account-text">{accountText}</View>
+        </View>
       </View>
+
+      {canUseCalendarActions && currentCalendarId ? (
+        <View className="nav-action-row">
+          <View
+            className="nav-action-btn primary"
+            onClick={() =>
+              Taro.navigateTo({ url: "/pages/calendar-create/index" })
+            }
+          >
+            创建
+          </View>
+          <View
+            className="nav-action-btn"
+            onClick={() =>
+              Taro.navigateTo({
+                url: `/pages/calendar-detail/index?id=${currentCalendarId}`,
+              })
+            }
+          >
+            设置
+          </View>
+          <View
+            className="nav-action-btn green"
+            onClick={() =>
+              Taro.navigateTo({
+                url: `/pages/calendar-members/index?calendar_id=${currentCalendarId}`,
+              })
+            }
+          >
+            成员
+          </View>
+        </View>
+      ) : null}
     </View>
   );
-
-  const handleDeleteCalendar = (calendar: Calendar) => {
-    if (normalizeCalendarRole(calendar) !== "owner") {
-      Taro.showToast({ title: "只有所有者可以删除日历", icon: "none" });
-      return;
-    }
-    Taro.showModal({
-      title: "确认删除日历",
-      content: "日历内记录、提醒将一并删除，确认继续吗？",
-      confirmText: "删除",
-      confirmColor: "#ef4444",
-      success: async (res) => {
-        if (!res.confirm) return;
-        try {
-          setDeletingId(calendar.id);
-          Taro.showLoading({ title: "删除中", mask: true });
-          await deleteCalendar(calendar.id);
-          Taro.hideLoading();
-          Taro.showToast({ title: "删除成功", icon: "success" });
-          await loadData(0);
-        } catch (err) {
-          console.error(err);
-          Taro.hideLoading();
-        } finally {
-          setDeletingId(null);
-        }
-      },
-    });
-  };
 
   const renderScheduleList = () => {
     if (selectedDateEvents.length === 0) {
@@ -513,74 +536,6 @@ export default function CalendarPage() {
   return (
     <View className="container calendar-container">
       {renderCustomNav()}
-      <View className="calendar-header slim">
-        <View>
-          <View className="page-title">
-            {selectedCalendar?.name || "客户记录"}
-          </View>
-        </View>
-        <View
-          className="create-calendar-btn"
-          onClick={() =>
-            Taro.navigateTo({ url: "/pages/calendar-create/index" })
-          }
-        >
-          创建
-        </View>
-      </View>
-
-      <View className="calendar-switch-card compact-switch">
-        <Picker
-          mode="selector"
-          range={calendarNames}
-          value={selectedCalendarIndex >= 0 ? selectedCalendarIndex : 0}
-          onChange={(e) => {
-            const selected = calendars[Number(e.detail.value)];
-            if (selected) changeCalendar(selected.id);
-          }}
-        >
-          <View className="calendar-picker">
-            当前日历：{selectedCalendar?.name || "请选择"}
-          </View>
-        </Picker>
-        <View className="calendar-actions">
-          <View
-            className="action-btn"
-            onClick={() =>
-              Taro.navigateTo({
-                url: `/pages/calendar-detail/index?id=${currentCalendarId}`,
-              })
-            }
-          >
-            设置
-          </View>
-          {showMembers && (
-            <View
-              className="action-btn green"
-              onClick={() =>
-                Taro.navigateTo({
-                  url: `/pages/calendar-members/index?calendar_id=${currentCalendarId}`,
-                })
-              }
-            >
-              成员
-            </View>
-          )}
-          {currentUserRole === "owner" && selectedCalendar && (
-            <View
-              className={
-                deletingId === selectedCalendar.id
-                  ? "action-btn danger disabled"
-                  : "action-btn danger"
-              }
-              onClick={() => handleDeleteCalendar(selectedCalendar)}
-            >
-              {deletingId === selectedCalendar.id ? "删除中" : "删除"}
-            </View>
-          )}
-        </View>
-      </View>
-
       <View className="filter-card">
         <Picker
           mode="selector"
@@ -613,6 +568,29 @@ export default function CalendarPage() {
           </View>
         </Picker>
       </View>
+
+      {writable && (
+        <View className="quick-status-card">
+          <View
+            className="quick-status-btn rest"
+            onClick={() => handleSpecialEvent("rest")}
+          >
+            设置休息
+          </View>
+          <View
+            className="quick-status-btn blocked"
+            onClick={() => handleSpecialEvent("blocked")}
+          >
+            设置不接
+          </View>
+          <View
+            className="quick-status-btn full"
+            onClick={() => handleSpecialEvent("full")}
+          >
+            设置已满
+          </View>
+        </View>
+      )}
 
       <View className="month-card">
         <View className="month-head">
@@ -712,29 +690,6 @@ export default function CalendarPage() {
           </View>
         )}
       </View>
-
-      {writable && (
-        <View className="quick-actions">
-          <View
-            className="quick-btn rest"
-            onClick={() => handleSpecialEvent("rest")}
-          >
-            设置休息
-          </View>
-          <View
-            className="quick-btn blocked"
-            onClick={() => handleSpecialEvent("blocked")}
-          >
-            设置不接
-          </View>
-          <View
-            className="quick-btn full"
-            onClick={() => handleSpecialEvent("full")}
-          >
-            设置已满
-          </View>
-        </View>
-      )}
 
       {renderScheduleList()}
     </View>
