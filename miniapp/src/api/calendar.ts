@@ -225,9 +225,19 @@ export function listCalendarEvents(
   });
 }
 
+export type SpecialDayType = "rest" | "blocked" | "full";
+
+export interface CreateSpecialCalendarEventParams {
+  date: string;
+  type: SpecialDayType;
+  start_time?: string;
+  all_day?: boolean;
+  remark?: string;
+}
+
 export function createSpecialCalendarEvent(
   calendarId: number,
-  data: { date: string; type: "rest" | "blocked" | "full" },
+  data: CreateSpecialCalendarEventParams,
 ) {
   return request<CalendarEvent>({
     url: `/api/calendars/${calendarId}/events/special`,

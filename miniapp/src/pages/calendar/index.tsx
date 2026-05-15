@@ -3,7 +3,6 @@ import Taro, { useDidShow, usePullDownRefresh, useRouter } from "@tarojs/taro";
 import { useMemo, useState } from "react";
 
 import {
-  createSpecialCalendarEvent,
   getMemberWorkloadStats,
   getMonthlyCalendarStats,
   listCalendarEvents,
@@ -167,7 +166,6 @@ export default function CalendarPage() {
   );
   const currentUserRole = normalizeCalendarRole(selectedCalendar);
   const writable = canCreateRecord(currentUserRole);
-  const canUseCalendarActions = writable;
 
   const calendarNames = useMemo(
     () => calendars.map((item) => item.name),
@@ -216,7 +214,6 @@ export default function CalendarPage() {
     [eventsByDate, selectedDate],
   );
 
-  const navTitle = selectedCalendar?.name || "客户预约";
   const accountName = getWechatDisplayName(currentUser);
   const accountText = accountName && accountName !== "-" ? accountName : "我的";
   const accountAvatarText =
@@ -301,12 +298,24 @@ export default function CalendarPage() {
   });
 
   useDidShow(() => {
-    if (routeSelectedDate) {
-      const nextDate = parseDate(routeSelectedDate);
-      setSelectedDate(routeSelectedDate);
+    const returnContext = Taro.getStorageSync("calendar_return_context") as {
+      calendar_id?: number;
+      selected_date?: string;
+      refresh_at?: number;
+    } | null;
+    if (returnContext) Taro.removeStorageSync("calendar_return_context");
+
+    const nextSelectedDate = returnContext?.selected_date || routeSelectedDate;
+    const nextCalendarId = Number(
+      returnContext?.calendar_id || routeCalendarId || currentCalendarId,
+    );
+
+    if (nextSelectedDate) {
+      const nextDate = parseDate(nextSelectedDate);
+      setSelectedDate(nextSelectedDate);
       setCurrentDate(nextDate);
     }
-    loadData(routeCalendarId || currentCalendarId);
+    loadData(nextCalendarId);
   });
 
   const changeCalendar = async (calendarId: number) => {
@@ -349,40 +358,93 @@ export default function CalendarPage() {
     setEvents(data.items || []);
   };
 
-  const goCreateRecord = () => {
+  const goCreateRecord = (date = selectedDate) => {
     if (!currentCalendarId) return;
     if (!writable) {
       Taro.showToast({ title: "你只有查看权限", icon: "none" });
       return;
     }
     Taro.navigateTo({
-      url: `/pages/record-create/index?calendar_id=${currentCalendarId}&selected_date=${selectedDate}`,
+      url: `/pages/record-create/index?calendar_id=${currentCalendarId}&selected_date=${date}`,
     });
   };
 
-  const handleSpecialEvent = async (type: "rest" | "blocked" | "full") => {
+  const goSetSpecialDay = (date: string, type: "rest" | "blocked" | "full") => {
+    if (!currentCalendarId) return;
     if (!writable) {
       Taro.showToast({ title: "你只有查看权限", icon: "none" });
       return;
     }
-    if (selectedDateEvents.some((item) => getEventStatus(item) === type)) {
-      Taro.showToast({ title: "当天已设置", icon: "none" });
+    Taro.navigateTo({
+      url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&type=${type}`,
+    });
+  };
+
+  const handleOpenCalendarActions = () => {
+    if (!currentCalendarId) {
+      Taro.showToast({ title: "请先选择日历", icon: "none" });
       return;
     }
-    const labels = { rest: "休息", blocked: "不接", full: "已满" };
-    try {
-      await createSpecialCalendarEvent(currentCalendarId, {
-        date: selectedDate,
-        type,
-      });
-      Taro.showToast({ title: `已设置${labels[type]}`, icon: "success" });
-      await Promise.all([
-        loadEvents(currentCalendarId),
-        loadStats(currentCalendarId),
-      ]);
-    } catch (err) {
-      console.error(err);
+
+    const itemList = writable
+      ? ["创建日历", "设置当前日历", "管理成员"]
+      : ["查看成员"];
+
+    Taro.showActionSheet({
+      itemList,
+      success: (res) => {
+        const item = itemList[res.tapIndex];
+
+        if (item === "创建日历") {
+          Taro.navigateTo({ url: "/pages/calendar-create/index" });
+          return;
+        }
+
+        if (item === "设置当前日历") {
+          Taro.navigateTo({
+            url: `/pages/calendar-detail/index?id=${currentCalendarId}`,
+          });
+          return;
+        }
+
+        if (item === "管理成员" || item === "查看成员") {
+          Taro.navigateTo({
+            url: `/pages/calendar-members/index?calendar_id=${currentCalendarId}`,
+          });
+        }
+      },
+    });
+  };
+
+  const handleLongPressDate = (date: string) => {
+    if (!currentCalendarId) {
+      Taro.showToast({ title: "请先选择日历", icon: "none" });
+      return;
     }
+
+    if (!writable) {
+      Taro.showToast({ title: "你只有查看权限", icon: "none" });
+      return;
+    }
+
+    setSelectedDate(date);
+    setCurrentDate(parseDate(date));
+
+    Taro.vibrateShort({ type: "light" });
+
+    Taro.showActionSheet({
+      itemList: ["新建日程", "设置休息", "设置不接", "设置已满"],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          goCreateRecord(date);
+          return;
+        }
+
+        const typeMap = ["rest", "blocked", "full"] as const;
+        const type = typeMap[res.tapIndex - 1];
+        if (type) goSetSpecialDay(date, type);
+      },
+    });
   };
 
   const goProfile = () => {
@@ -402,50 +464,21 @@ export default function CalendarPage() {
             if (selected) changeCalendar(selected.id);
           }}
         >
-          <View className="nav-calendar-name">
-            <Text className="nav-calendar-label">当前日历</Text>
-            <Text className="nav-calendar-text">{navTitle}</Text>
-            <Text className="nav-calendar-arrow">⌄</Text>
+          <View className="nav-calendar-pill">
+            当前日历 {selectedCalendar?.name || "选择日历"}
           </View>
         </Picker>
-        <View className="nav-account" onClick={goProfile}>
-          <View className="nav-account-avatar">{accountAvatarText}</View>
-          <View className="nav-account-text">{accountText}</View>
+
+        <View className="nav-right">
+          <View className="nav-account" onClick={goProfile}>
+            <View className="nav-account-avatar">{accountAvatarText}</View>
+            <View className="nav-account-text">{accountText}</View>
+          </View>
+          <View className="nav-config-btn" onClick={handleOpenCalendarActions}>
+            ⚙
+          </View>
         </View>
       </View>
-
-      {canUseCalendarActions && currentCalendarId ? (
-        <View className="nav-action-row">
-          <View
-            className="nav-action-btn primary"
-            onClick={() =>
-              Taro.navigateTo({ url: "/pages/calendar-create/index" })
-            }
-          >
-            创建
-          </View>
-          <View
-            className="nav-action-btn"
-            onClick={() =>
-              Taro.navigateTo({
-                url: `/pages/calendar-detail/index?id=${currentCalendarId}`,
-              })
-            }
-          >
-            设置
-          </View>
-          <View
-            className="nav-action-btn green"
-            onClick={() =>
-              Taro.navigateTo({
-                url: `/pages/calendar-members/index?calendar_id=${currentCalendarId}`,
-              })
-            }
-          >
-            成员
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 
@@ -454,11 +487,7 @@ export default function CalendarPage() {
       return (
         <View className="empty-box">
           <View className="empty-title">这一天还没有日程</View>
-          {writable && (
-            <View className="empty-create-btn" onClick={goCreateRecord}>
-              创建第一条日程
-            </View>
-          )}
+          {writable && <View className="empty-hint">长按日期可新建日程</View>}
         </View>
       );
     }
@@ -569,29 +598,6 @@ export default function CalendarPage() {
         </Picker>
       </View>
 
-      {writable && (
-        <View className="quick-status-card">
-          <View
-            className="quick-status-btn rest"
-            onClick={() => handleSpecialEvent("rest")}
-          >
-            设置休息
-          </View>
-          <View
-            className="quick-status-btn blocked"
-            onClick={() => handleSpecialEvent("blocked")}
-          >
-            设置不接
-          </View>
-          <View
-            className="quick-status-btn full"
-            onClick={() => handleSpecialEvent("full")}
-          >
-            设置已满
-          </View>
-        </View>
-      )}
-
       <View className="month-card">
         <View className="month-head">
           <View className="month-btn" onClick={() => changeMonth(-1)}>
@@ -614,6 +620,8 @@ export default function CalendarPage() {
           </View>
         </View>
 
+        <View className="calendar-hint">长按日期可新建日程 / 设置状态</View>
+
         <View className="weekday-row">
           {["日", "一", "二", "三", "四", "五", "六"].map((day) => (
             <View key={day} className="weekday">
@@ -631,6 +639,7 @@ export default function CalendarPage() {
                 key={item.key}
                 className={`day-cell appointment-cell ${item.date === selectedDate ? "active" : ""} ${item.date === todayText ? "today" : ""}`}
                 onClick={() => item.date && setSelectedDate(item.date)}
+                onLongPress={() => item.date && handleLongPressDate(item.date)}
               >
                 {item.day ? (
                   <Text className="day-number">{item.day}</Text>
@@ -684,11 +693,6 @@ export default function CalendarPage() {
             {selectedDate} ｜ {selectedDateEvents.length} 条
           </View>
         </View>
-        {writable && (
-          <View className="new-record-btn" onClick={goCreateRecord}>
-            新建日程
-          </View>
-        )}
       </View>
 
       {renderScheduleList()}
