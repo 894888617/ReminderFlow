@@ -1,6 +1,7 @@
 package record
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"reminder-flow/internal/modules/subscription"
@@ -31,16 +32,20 @@ func NewHandler(
 }
 
 type CreateRecordRequest struct {
-	WorkspaceID     int64   `json:"workspace_id"`
-	CalendarID      int64   `json:"calendar_id"`
-	Title           string  `json:"title"`
-	Content         string  `json:"content"`
-	AssigneeID      *int64  `json:"assignee_id"`
-	DueAt           string  `json:"due_at"`
-	RemindAt        string  `json:"remind_at"`
-	CalendarStartAt string  `json:"calendar_start_at"`
-	CalendarEndAt   *string `json:"calendar_end_at"`
-	CalendarAllDay  *bool   `json:"calendar_all_day"`
+	WorkspaceID       int64   `json:"workspace_id"`
+	CalendarID        int64   `json:"calendar_id"`
+	Title             string  `json:"title"`
+	Content           string  `json:"content"`
+	AssigneeID        *int64  `json:"assignee_id"`
+	DueAt             string  `json:"due_at"`
+	RemindAt          string  `json:"remind_at"`
+	CalendarStartAt   string  `json:"calendar_start_at"`
+	CalendarEndAt     *string `json:"calendar_end_at"`
+	CalendarAllDay    *bool   `json:"calendar_all_day"`
+	AppointmentStatus string  `json:"appointment_status"`
+	CustomerName      string  `json:"customer_name"`
+	CustomerPhone     string  `json:"customer_phone"`
+	ServiceName       string  `json:"service_name"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -143,20 +148,28 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	rec, err := h.repo.Create(c.Request.Context(), CreateRecordParams{
-		WorkspaceID:     0,
-		CalendarID:      calendarID,
-		Title:           req.Title,
-		Content:         req.Content,
-		CreatorID:       currentUserID,
-		AssigneeID:      req.AssigneeID,
-		DueAt:           dueAt,
-		CalendarStartAt: calendarStartAt,
-		CalendarEndAt:   calendarEndAt,
-		CalendarAllDay:  calendarAllDay,
-		RemindAt:        remindAt,
+		WorkspaceID:       0,
+		CalendarID:        calendarID,
+		Title:             req.Title,
+		Content:           req.Content,
+		CreatorID:         currentUserID,
+		AssigneeID:        req.AssigneeID,
+		DueAt:             dueAt,
+		CalendarStartAt:   calendarStartAt,
+		CalendarEndAt:     calendarEndAt,
+		CalendarAllDay:    calendarAllDay,
+		RemindAt:          remindAt,
+		AppointmentStatus: strings.ToLower(strings.TrimSpace(req.AppointmentStatus)),
+		CustomerName:      req.CustomerName,
+		CustomerPhone:     req.CustomerPhone,
+		ServiceName:       req.ServiceName,
 	})
 
 	if err != nil {
+		if errors.Is(err, ErrScheduleConflict) {
+			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "msg": "该时间段已有安排"})
+			return
+		}
 		response.Internal(c, "create record failed")
 		return
 	}

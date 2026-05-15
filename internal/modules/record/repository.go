@@ -2,6 +2,7 @@ package record
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrScheduleConflict = errors.New("schedule conflict")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -37,17 +40,21 @@ type Record struct {
 }
 
 type CreateRecordParams struct {
-	WorkspaceID     int64
-	CalendarID      int64
-	Title           string
-	Content         string
-	CreatorID       int64
-	AssigneeID      *int64
-	DueAt           *time.Time
-	CalendarStartAt *time.Time
-	CalendarEndAt   *time.Time
-	CalendarAllDay  bool
-	RemindAt        *time.Time
+	WorkspaceID       int64
+	CalendarID        int64
+	Title             string
+	Content           string
+	CreatorID         int64
+	AssigneeID        *int64
+	DueAt             *time.Time
+	CalendarStartAt   *time.Time
+	CalendarEndAt     *time.Time
+	CalendarAllDay    bool
+	RemindAt          *time.Time
+	AppointmentStatus string
+	CustomerName      string
+	CustomerPhone     string
+	ServiceName       string
 }
 
 func (r *Repository) GetCalendarMemberRole(ctx context.Context, calendarID, userID int64) (string, error) {
@@ -95,6 +102,16 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	}
 	defer tx.Rollback(ctx)
 
+	if params.AppointmentStatus == "" {
+		params.AppointmentStatus = "pending"
+	}
+
+	if params.CalendarStartAt != nil {
+		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
+			return nil, err
+		}
+	}
+
 	var rec Record
 	err = tx.QueryRow(ctx, `
 		INSERT INTO records (
@@ -105,9 +122,12 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			creator_id,
 			assignee_id,
 			status,
-			due_at
+			due_at,
+			customer_name,
+			customer_phone,
+			service_name
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7)
+		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, $8, $9, $10)
 		RETURNING
 			id,
 			COALESCE(workspace_id, calendar_id, 0),
@@ -128,6 +148,9 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.CreatorID,
 		params.AssigneeID,
 		params.DueAt,
+		strings.TrimSpace(params.CustomerName),
+		strings.TrimSpace(params.CustomerPhone),
+		strings.TrimSpace(params.ServiceName),
 	).Scan(
 		&rec.ID,
 		&rec.WorkspaceID,
@@ -172,10 +195,11 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 				all_day,
 				timezone,
 				status,
+				event_type,
 				created_by
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', 'active', $7)
-		`, params.CalendarID, rec.ID, rec.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.CreatorID)
+			VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', $7, 'appointment', $8)
+		`, params.CalendarID, rec.ID, rec.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AppointmentStatus, params.CreatorID)
 		if err != nil {
 			return nil, err
 		}
@@ -186,6 +210,54 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	}
 
 	return &rec, nil
+}
+
+func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64, startAt *time.Time, endAt *time.Time) error {
+	if startAt == nil {
+		return nil
+	}
+	checkEnd := endAt
+	fallbackEnd := startAt.Add(time.Hour)
+	if checkEnd == nil || !checkEnd.After(*startAt) {
+		checkEnd = &fallbackEnd
+	}
+	dayStart := time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 0, 0, 0, 0, startAt.Location())
+	dayEnd := dayStart.AddDate(0, 0, 1)
+
+	var blockedCount int64
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM calendar_events ce
+		WHERE ce.calendar_id = $1
+		  AND ce.deleted_at IS NULL
+		  AND ce.start_at >= $2
+		  AND ce.start_at < $3
+		  AND LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full')
+	`, calendarID, dayStart, dayEnd).Scan(&blockedCount); err != nil {
+		return err
+	}
+	if blockedCount > 0 {
+		return ErrScheduleConflict
+	}
+
+	var conflictCount int64
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM calendar_events ce
+		LEFT JOIN records rec ON rec.id = ce.record_id
+		WHERE ce.calendar_id = $1
+		  AND ce.deleted_at IS NULL
+		  AND LOWER(COALESCE(ce.event_type, 'record')) NOT IN ('rest', 'blocked', 'full')
+		  AND LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) NOT IN ('cancelled', 'rest', 'blocked', 'full')
+		  AND ce.start_at < $3
+		  AND COALESCE(ce.end_at, ce.start_at + INTERVAL '1 hour') > $2
+	`, calendarID, startAt, checkEnd).Scan(&conflictCount); err != nil {
+		return err
+	}
+	if conflictCount > 0 {
+		return ErrScheduleConflict
+	}
+	return nil
 }
 
 func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParams) (*PageResult, error) {

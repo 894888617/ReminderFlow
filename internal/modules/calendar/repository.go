@@ -3,6 +3,7 @@ package calendar
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -366,13 +367,42 @@ func (r *Repository) RemoveMember(ctx context.Context, operatorID, calendarID, m
 	return err
 }
 
-func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID int64, startAt, endAt time.Time) ([]CalendarEvent, error) {
+func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID int64, startAt, endAt time.Time, filters CalendarEventFilters) ([]CalendarEvent, error) {
 	role, err := r.GetUserRole(ctx, userID, calendarID)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	whereParts := []string{
+		"ce.calendar_id = $1",
+		"cm.user_id = $2",
+		"c.deleted_at IS NULL",
+		"ce.deleted_at IS NULL",
+		"ce.start_at >= $3",
+		"ce.start_at < $4",
+		"(ce.record_id IS NULL OR (rec.id IS NOT NULL AND rec.deleted_at IS NULL))",
+	}
+	args := []any{calendarID, userID, startAt, endAt}
+	argIndex := 5
+
+	if filters.AssigneeID != nil {
+		whereParts = append(whereParts, fmt.Sprintf("rec.assignee_id = $%d", argIndex))
+		args = append(args, *filters.AssigneeID)
+		argIndex++
+	}
+	if filters.Status != "" && filters.Status != "all" {
+		whereParts = append(whereParts, fmt.Sprintf("%s = $%d", statusExpr, argIndex))
+		args = append(args, strings.ToLower(filters.Status))
+		argIndex++
+	}
+	if filters.EventType != "" && filters.EventType != "all" {
+		whereParts = append(whereParts, fmt.Sprintf("LOWER(COALESCE(ce.event_type, 'record')) = $%d", argIndex))
+		args = append(args, strings.ToLower(filters.EventType))
+		argIndex++
+	}
+
+	sql := fmt.Sprintf(`
 		SELECT
 			ce.id,
 			ce.calendar_id,
@@ -380,7 +410,8 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			ce.title,
 			COALESCE(rec.title, ''),
 			COALESCE(rec.content, ''),
-			LOWER(COALESCE(rec.status, ce.status, '')),
+			%s,
+			LOWER(COALESCE(ce.event_type, 'record')),
 			rec.assignee_id,
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			ce.start_at,
@@ -390,18 +421,17 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 		INNER JOIN calendars c ON c.id = ce.calendar_id
 		INNER JOIN calendar_members cm
 			ON cm.calendar_id = ce.calendar_id
-			AND cm.user_id = $2
 			AND cm.status = 'active'
 		LEFT JOIN records rec ON rec.id = ce.record_id
 		LEFT JOIN users u ON u.id = rec.assignee_id
-		WHERE ce.calendar_id = $1
-		  AND c.deleted_at IS NULL
-		  AND ce.deleted_at IS NULL
-		  AND ce.start_at >= $3
-		  AND ce.start_at < $4
-		  AND (ce.record_id IS NULL OR (rec.id IS NOT NULL AND rec.deleted_at IS NULL))
-		ORDER BY ce.start_at ASC, ce.id ASC
-	`, calendarID, userID, startAt, endAt)
+		WHERE %s
+		ORDER BY
+			CASE WHEN LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full') THEN 0 ELSE 1 END,
+			ce.start_at ASC,
+			ce.id ASC
+	`, statusExpr, strings.Join(whereParts, " AND "))
+
+	rows, err := r.db.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -420,6 +450,7 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			&item.RecordTitle,
 			&item.RecordContent,
 			&item.Status,
+			&item.EventType,
 			&item.AssigneeID,
 			&item.AssigneeName,
 			&start,
@@ -428,6 +459,7 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 		); err != nil {
 			return nil, err
 		}
+		item.ID = item.EventID
 		item.StartAt = formatShanghaiTimestamp(start)
 		if end != nil {
 			formatted := formatShanghaiTimestamp(*end)
@@ -440,6 +472,139 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 		return nil, err
 	}
 	return items, nil
+}
+
+func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID int64, params CreateSpecialEventParams) (*CalendarEvent, error) {
+	if err := r.EnsureCalendarEditable(ctx, userID, calendarID); err != nil {
+		return nil, err
+	}
+
+	titleMap := map[string]string{"rest": "休息", "blocked": "不接", "full": "已满"}
+	title := titleMap[params.EventType]
+	if title == "" {
+		return nil, ErrNoPermission
+	}
+
+	var existing int64
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM calendar_events
+		WHERE calendar_id = $1
+		  AND deleted_at IS NULL
+		  AND LOWER(COALESCE(event_type, 'record')) = $2
+		  AND start_at >= $3
+		  AND start_at < $4
+		LIMIT 1
+	`, calendarID, params.EventType, params.Date, params.Date.AddDate(0, 0, 1)).Scan(&existing)
+	if err == nil {
+		items, listErr := r.ListCalendarEvents(ctx, userID, calendarID, params.Date, params.Date.AddDate(0, 0, 1), CalendarEventFilters{EventType: params.EventType})
+		if listErr != nil || len(items) == 0 {
+			return &CalendarEvent{ID: existing, EventID: existing, CalendarID: calendarID, Title: title, Status: params.EventType, EventType: params.EventType, StartAt: formatShanghaiTimestamp(params.Date), AllDay: true}, listErr
+		}
+		return &items[0], nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	var item CalendarEvent
+	var start time.Time
+	err = r.db.QueryRow(ctx, `
+		INSERT INTO calendar_events (
+			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by
+		)
+		VALUES ($1, $2, $3, NULL, true, 'Asia/Shanghai', $4, $4, $5)
+		RETURNING id, calendar_id, title, status, event_type, start_at, all_day
+	`, calendarID, title, params.Date, params.EventType, userID).Scan(
+		&item.EventID,
+		&item.CalendarID,
+		&item.Title,
+		&item.Status,
+		&item.EventType,
+		&start,
+		&item.AllDay,
+	)
+	if err != nil {
+		return nil, err
+	}
+	item.ID = item.EventID
+	item.StartAt = formatShanghaiTimestamp(start)
+	item.CurrentUserRole = RoleMember
+	return &item, nil
+}
+
+func (r *Repository) MonthlyStats(ctx context.Context, userID, calendarID int64, month string, startAt, endAt time.Time) (*MonthlyStats, error) {
+	if _, err := r.GetUserRole(ctx, userID, calendarID); err != nil {
+		return nil, err
+	}
+	stats := MonthlyStats{Month: month}
+	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	err := r.db.QueryRow(ctx, fmt.Sprintf(`
+		SELECT
+			COUNT(*) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) NOT IN ('rest','blocked','full')),
+			COUNT(*) FILTER (WHERE %s = 'pending'),
+			COUNT(*) FILTER (WHERE %s = 'confirmed'),
+			COUNT(*) FILTER (WHERE %s IN ('done', 'completed')),
+			COUNT(*) FILTER (WHERE %s = 'cancelled'),
+			COUNT(DISTINCT ce.start_at::date) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) = 'rest'),
+			COUNT(DISTINCT ce.start_at::date) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) = 'full')
+		FROM calendar_events ce
+		INNER JOIN calendar_members cm ON cm.calendar_id = ce.calendar_id AND cm.user_id = $2 AND cm.status = 'active'
+		LEFT JOIN records rec ON rec.id = ce.record_id
+		WHERE ce.calendar_id = $1
+		  AND ce.deleted_at IS NULL
+		  AND ce.start_at >= $3
+		  AND ce.start_at < $4
+		  AND (ce.record_id IS NULL OR (rec.id IS NOT NULL AND rec.deleted_at IS NULL))
+	`, statusExpr, statusExpr, statusExpr, statusExpr), calendarID, userID, startAt, endAt).Scan(&stats.Total, &stats.Pending, &stats.Confirmed, &stats.Done, &stats.Cancelled, &stats.RestDays, &stats.FullDays)
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+func (r *Repository) MemberWorkloadStats(ctx context.Context, userID, calendarID int64, month string, startAt, endAt time.Time) (*MemberWorkloadStats, error) {
+	if _, err := r.GetUserRole(ctx, userID, calendarID); err != nil {
+		return nil, err
+	}
+	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT
+			u.id,
+			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
+			COUNT(*),
+			COUNT(*) FILTER (WHERE %s IN ('done', 'completed')),
+			COUNT(*) FILTER (WHERE %s = 'cancelled'),
+			COUNT(*) FILTER (WHERE %s = 'pending')
+		FROM calendar_events ce
+		INNER JOIN calendar_members cm ON cm.calendar_id = ce.calendar_id AND cm.user_id = $2 AND cm.status = 'active'
+		INNER JOIN records rec ON rec.id = ce.record_id AND rec.deleted_at IS NULL
+		LEFT JOIN users u ON u.id = rec.assignee_id
+		WHERE ce.calendar_id = $1
+		  AND ce.deleted_at IS NULL
+		  AND ce.start_at >= $3
+		  AND ce.start_at < $4
+		  AND LOWER(COALESCE(ce.event_type, 'record')) NOT IN ('rest','blocked','full')
+		  AND rec.assignee_id IS NOT NULL
+		GROUP BY u.id, COALESCE(NULLIF(u.nickname, ''), u.username, '')
+		ORDER BY COUNT(*) DESC, u.id ASC
+	`, statusExpr, statusExpr, statusExpr), calendarID, userID, startAt, endAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	stats := MemberWorkloadStats{Month: month, Items: []MemberWorkloadItem{}}
+	for rows.Next() {
+		var item MemberWorkloadItem
+		if err := rows.Scan(&item.UserID, &item.Name, &item.Total, &item.Done, &item.Cancelled, &item.Pending); err != nil {
+			return nil, err
+		}
+		stats.Items = append(stats.Items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &stats, nil
 }
 
 func (r *Repository) UpdateCalendarEventTime(ctx context.Context, userID, eventID int64, params CalendarEventTimeParams) error {

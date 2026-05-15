@@ -1,40 +1,49 @@
-import { View, Text, Input, Textarea, Picker } from '@tarojs/components'
-import Taro, { useDidShow, useRouter } from '@tarojs/taro'
-import { useEffect, useMemo, useState } from 'react'
+import { View, Text, Input, Textarea, Picker } from "@tarojs/components";
+import Taro, { useDidShow, useRouter } from "@tarojs/taro";
+import { useEffect, useMemo, useState } from "react";
 
 import {
+  listCalendarEvents,
   listCalendarMembers,
   listCalendars,
   normalizeCalendarRole,
   type Calendar,
   type CalendarMember,
-} from '../../api/calendar'
-import { createRecord } from '../../api/record'
-import { canCreateRecord } from '../../utils/permission'
-import { createReminder, type RepeatType } from '../../api/reminder'
+} from "../../api/calendar";
+import { createRecord } from "../../api/record";
+import { canCreateRecord } from "../../utils/permission";
+import { createReminder, type RepeatType } from "../../api/reminder";
 
-import { getStoredToken, getStoredUser } from '../../utils/auth'
-import { getUserNameDisplay } from '../../utils/userDisplay'
-import './index.scss'
+import { getStoredToken, getStoredUser } from "../../utils/auth";
+import { getUserNameDisplay } from "../../utils/userDisplay";
+import "./index.scss";
+
+const statusOptions = [
+  { label: "待处理", value: "pending" },
+  { label: "已确认", value: "confirmed" },
+  { label: "进行中", value: "in_progress" },
+  { label: "已完成", value: "done" },
+  { label: "已取消", value: "cancelled" },
+];
 
 const repeatOptions: { label: string; value: RepeatType }[] = [
-  { label: '不重复', value: 'NONE' },
-  { label: '每天', value: 'DAILY' },
-  { label: '每周', value: 'WEEKLY' },
-  { label: '每月', value: 'MONTHLY' },
-]
+  { label: "不重复", value: "NONE" },
+  { label: "每天", value: "DAILY" },
+  { label: "每周", value: "WEEKLY" },
+  { label: "每月", value: "MONTHLY" },
+];
 
 function buildDateTime(date: string, time: string) {
-  if (!date || !time) return undefined
-  return `${date}T${time}:00+08:00`
+  if (!date || !time) return undefined;
+  return `${date}T${time}:00+08:00`;
 }
 
 function todayDate() {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // function currentTime() {
@@ -44,306 +53,408 @@ function todayDate() {
 //   return `${hh}:${mm}`
 // }
 
-const DEFAULT_DUE_TIME = '20:00'
-const DEFAULT_REMIND_TIME = '18:00'
+const DEFAULT_DUE_TIME = "23:59";
+const DEFAULT_START_TIME = "10:00";
+const DEFAULT_END_TIME = "11:00";
+const DEFAULT_REMIND_TIME = "18:00";
+
+function addMinutes(date: Date, minutes: number) {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+}
+
+function formatTime(date: Date) {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function isSameDay(dateText: string) {
+  return dateText === todayDate();
+}
+
+function normalizeStatus(status?: string | null) {
+  return String(status || "pending").toLowerCase();
+}
 
 function addDays(dateText: string, days: number) {
-  const [yyyy, mm, dd] = dateText.split('-').map(Number)
-  const date = new Date(yyyy, (mm || 1) - 1, dd || 1)
-  date.setDate(date.getDate() + days)
+  const [yyyy, mm, dd] = dateText.split("-").map(Number);
+  const date = new Date(yyyy, (mm || 1) - 1, dd || 1);
+  date.setDate(date.getDate() + days);
 
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
 
-  return `${y}-${m}-${d}`
+  return `${y}-${m}-${d}`;
 }
 
 export default function RecordCreatePage() {
-  const router = useRouter()
+  const router = useRouter();
 
-  const routeCalendarId = Number(router.params.calendar_id || router.params.workspace_id || 0)
-  const selectedDate = String(router.params.selected_date || '')
-  const currentUser = getStoredUser()
-  const defaultDueDate = selectedDate || todayDate()
-  const defaultRemindDate = addDays(defaultDueDate, -1)
+  const routeCalendarId = Number(
+    router.params.calendar_id || router.params.workspace_id || 0,
+  );
+  const selectedDate = String(router.params.selected_date || "");
+  const currentUser = getStoredUser();
+  const defaultDueDate = selectedDate || todayDate();
+  const defaultRemindDate = isSameDay(defaultDueDate)
+    ? defaultDueDate
+    : addDays(defaultDueDate, -1);
+  const defaultRemindTime = isSameDay(defaultDueDate)
+    ? formatTime(addMinutes(new Date(), 30))
+    : DEFAULT_REMIND_TIME;
 
-  const [calendars, setCalendars] = useState<Calendar[]>([])
-  const [calendarId, setCalendarId] = useState<number>(routeCalendarId || 0)
-  const [members, setMembers] = useState<CalendarMember[]>([])
-  const [assigneeId, setAssigneeId] = useState<number | undefined>()
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [calendarId, setCalendarId] = useState<number>(routeCalendarId || 0);
+  const [members, setMembers] = useState<CalendarMember[]>([]);
+  const [assigneeId, setAssigneeId] = useState<number | undefined>();
 
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [serviceName, setServiceName] = useState("");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState(defaultDueDate);
+  const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
+  const [endTime, setEndTime] = useState(DEFAULT_END_TIME);
+  const [statusIndex, setStatusIndex] = useState(0);
 
-  const [dueDate, setDueDate] = useState(defaultDueDate)
-  const [dueTime, setDueTime] = useState(DEFAULT_DUE_TIME)
+  const [dueDate, setDueDate] = useState(defaultDueDate);
+  const [dueTime, setDueTime] = useState(DEFAULT_DUE_TIME);
 
-  const [remindDate, setRemindDate] = useState(defaultRemindDate)
-  const [remindTime, setRemindTime] = useState(DEFAULT_REMIND_TIME)
+  const [remindDate, setRemindDate] = useState(defaultRemindDate);
+  const [remindTime, setRemindTime] = useState(defaultRemindTime);
 
-  const [repeatIndex, setRepeatIndex] = useState(0)
-  const [submitting, setSubmitting] = useState(false)
+  const [repeatIndex, setRepeatIndex] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
   const calendarNames = useMemo(() => {
-    return calendars.map((item) => item.name)
-  }, [calendars])
+    return calendars.map((item) => item.name);
+  }, [calendars]);
 
   const selectedCalendarIndex = useMemo(() => {
-    if (!calendarId) return -1
-    return calendars.findIndex((item) => item.id === calendarId)
-  }, [calendars, calendarId])
+    if (!calendarId) return -1;
+    return calendars.findIndex((item) => item.id === calendarId);
+  }, [calendars, calendarId]);
 
   const selectedCalendar = useMemo(() => {
-    return calendars.find((item) => item.id === calendarId)
-  }, [calendars, calendarId])
+    return calendars.find((item) => item.id === calendarId);
+  }, [calendars, calendarId]);
 
   const memberOptions = useMemo(() => {
     return members.map((item) => ({
       label: getUserNameDisplay(item),
       value: item.user_id,
-    }))
-  }, [members])
+    }));
+  }, [members]);
 
   const selectedAssigneeIndex = useMemo(() => {
-    if (!assigneeId) return -1
-    return memberOptions.findIndex((item) => item.value === assigneeId)
-  }, [memberOptions, assigneeId])
+    if (!assigneeId) return -1;
+    return memberOptions.findIndex((item) => item.value === assigneeId);
+  }, [memberOptions, assigneeId]);
 
   const selectedAssigneeName = useMemo(() => {
-    if (!assigneeId) return '未分配'
+    if (!assigneeId) return "未分配";
 
-    const selected = memberOptions.find((item) => item.value === assigneeId)
-    return selected?.label || '未分配'
-  }, [memberOptions, assigneeId])
+    const selected = memberOptions.find((item) => item.value === assigneeId);
+    return selected?.label || "未分配";
+  }, [memberOptions, assigneeId]);
 
   const loadCalendars = async () => {
-    const token = getStoredToken()
+    const token = getStoredToken();
 
     if (!token) {
       Taro.redirectTo({
-        url: '/pages/login/index',
-      })
-      return
+        url: "/pages/login/index",
+      });
+      return;
     }
 
     try {
-      const data = await listCalendars()
+      const data = await listCalendars();
       const writableCalendars = (data || []).filter((item) =>
-        canCreateRecord(normalizeCalendarRole(item))
-      )
+        canCreateRecord(normalizeCalendarRole(item)),
+      );
 
-      setCalendars(writableCalendars)
+      setCalendars(writableCalendars);
 
       if (routeCalendarId) {
-        const target = writableCalendars.find((item) => item.id === routeCalendarId)
+        const target = writableCalendars.find(
+          (item) => item.id === routeCalendarId,
+        );
 
         if (target) {
-          setCalendarId(target.id)
-          return
+          setCalendarId(target.id);
+          return;
         }
 
         Taro.showToast({
-          title: '当前日历无创建权限',
-          icon: 'none',
-        })
+          title: "当前日历无创建权限",
+          icon: "none",
+        });
       }
 
       if (!calendarId && writableCalendars.length > 0) {
-        setCalendarId(writableCalendars[0].id)
+        setCalendarId(writableCalendars[0].id);
       }
 
       if (calendarId) {
-        const current = writableCalendars.find((item) => item.id === calendarId)
+        const current = writableCalendars.find(
+          (item) => item.id === calendarId,
+        );
 
         if (!current) {
-          setCalendarId(writableCalendars[0]?.id || 0)
+          setCalendarId(writableCalendars[0]?.id || 0);
         }
       }
     } catch (err) {
-      console.error(err)
+      console.error(err);
     }
-  }
+  };
 
   useDidShow(() => {
-    loadCalendars()
-  })
+    loadCalendars();
+  });
 
   useEffect(() => {
     if (!calendarId) {
-      setMembers([])
-      setAssigneeId(undefined)
-      return
+      setMembers([]);
+      setAssigneeId(undefined);
+      return;
     }
 
-    let active = true
+    let active = true;
 
     listCalendarMembers(calendarId)
       .then((data) => {
-        if (!active) return
+        if (!active) return;
 
-        const items = data || []
+        const items = data || [];
 
-        setMembers(items)
+        setMembers(items);
 
         setAssigneeId((current) => {
           if (current && items.some((item) => item.user_id === current)) {
-            return current
+            return current;
           }
 
-          if (currentUser?.id && items.some((item) => item.user_id === currentUser.id)) {
-            return currentUser.id
+          if (
+            currentUser?.id &&
+            items.some((item) => item.user_id === currentUser.id)
+          ) {
+            return currentUser.id;
           }
 
-          return undefined
-        })
+          return undefined;
+        });
       })
       .catch((err) => {
-        console.error(err)
+        console.error(err);
 
         if (active) {
-          setMembers([])
-          setAssigneeId(undefined)
+          setMembers([]);
+          setAssigneeId(undefined);
         }
-      })
+      });
 
     return () => {
-      active = false
-    }
-  }, [calendarId])
+      active = false;
+    };
+  }, [calendarId]);
 
   const handleSubmit = async () => {
-    if (submitting) return
+    if (submitting) return;
 
     if (calendars.length === 0) {
       Taro.showToast({
-        title: '暂无可创建记录的日历',
-        icon: 'none',
-      })
-      return
+        title: "暂无可创建记录的日历",
+        icon: "none",
+      });
+      return;
     }
 
     if (!calendarId) {
       Taro.showToast({
-        title: '请选择日历',
-        icon: 'none',
-      })
-      return
+        title: "请选择日历",
+        icon: "none",
+      });
+      return;
     }
 
-    if (!title.trim()) {
+    const finalTitle =
+      title.trim() ||
+      [customerName.trim(), serviceName.trim()].filter(Boolean).join(" ");
+
+    if (!finalTitle) {
       Taro.showToast({
-        title: '请输入标题',
-        icon: 'none',
-      })
-      return
+        title: "请输入标题或客户姓名",
+        icon: "none",
+      });
+      return;
     }
 
-    const finalDueDate = dueDate || defaultDueDate
-    const finalDueTime = dueTime || DEFAULT_DUE_TIME
-    const finalRemindDate = remindDate || defaultRemindDate
-    const finalRemindTime = remindTime || DEFAULT_REMIND_TIME
+    const finalAppointmentDate = appointmentDate || defaultDueDate;
+    const finalStartTime = startTime || DEFAULT_START_TIME;
+    const finalEndTime = endTime || DEFAULT_END_TIME;
+    const finalDueDate = dueDate || finalAppointmentDate;
+    const finalDueTime = dueTime || DEFAULT_DUE_TIME;
+    const finalRemindDate = remindDate || defaultRemindDate;
+    const finalRemindTime = remindTime || DEFAULT_REMIND_TIME;
 
-    const dueAt = buildDateTime(finalDueDate, finalDueTime)
-    const remindAt = buildDateTime(finalRemindDate, finalRemindTime)
+    const dueAt = buildDateTime(finalDueDate, finalDueTime);
+    const remindAt = buildDateTime(finalRemindDate, finalRemindTime);
+    const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
+    const calendarEndAt = buildDateTime(finalAppointmentDate, finalEndTime);
 
     if ((dueDate && !dueTime) || (!dueDate && dueTime)) {
       Taro.showToast({
-        title: '请完整选择截止日期和时间',
-        icon: 'none',
-      })
-      return
+        title: "请完整选择截止日期和时间",
+        icon: "none",
+      });
+      return;
+    }
+
+    if (
+      calendarStartAt &&
+      calendarEndAt &&
+      new Date(calendarEndAt).getTime() <= new Date(calendarStartAt).getTime()
+    ) {
+      Taro.showToast({ title: "结束时间必须晚于开始时间", icon: "none" });
+      return;
+    }
+
+    try {
+      const dayEvents = await listCalendarEvents(calendarId, {
+        start: finalAppointmentDate,
+        end: addDays(finalAppointmentDate, 1),
+      });
+      const conflict = (dayEvents.items || []).some((item) => {
+        const status = normalizeStatus(item.event_type || item.status);
+        if (status === "rest" || status === "blocked" || status === "full")
+          return true;
+        if (status === "cancelled") return false;
+        if (
+          !item.start_at ||
+          !item.end_at ||
+          !calendarStartAt ||
+          !calendarEndAt
+        )
+          return false;
+        return (
+          new Date(calendarStartAt).getTime() <
+            new Date(item.end_at).getTime() &&
+          new Date(calendarEndAt).getTime() > new Date(item.start_at).getTime()
+        );
+      });
+      if (conflict) {
+        Taro.showToast({ title: "该时间段已有安排，请调整时间", icon: "none" });
+        return;
+      }
+    } catch (err) {
+      console.error(err);
     }
 
     if ((remindDate && !remindTime) || (!remindDate && remindTime)) {
       Taro.showToast({
-        title: '请完整选择提醒日期和时间',
-        icon: 'none',
-      })
-      return
+        title: "请完整选择提醒日期和时间",
+        icon: "none",
+      });
+      return;
     }
 
     try {
-      setSubmitting(true)
+      setSubmitting(true);
 
       Taro.showLoading({
-        title: '创建中',
+        title: "创建中",
         mask: true,
-      })
+      });
 
       const record = await createRecord({
         workspace_id: calendarId,
-        title: title.trim(),
-        content: content.trim(),
+        calendar_id: calendarId,
+        title: finalTitle,
+        content: [
+          customerName.trim() ? `客户：${customerName.trim()}` : "",
+          customerPhone.trim() ? `电话：${customerPhone.trim()}` : "",
+          serviceName.trim() ? `项目：${serviceName.trim()}` : "",
+          content.trim(),
+        ]
+          .filter(Boolean)
+          .join("\n"),
         assignee_id: assigneeId,
         due_at: dueAt,
 
-        calendar_start_at: selectedDate
-          ? `${selectedDate}T00:00:00+08:00`
-          : undefined,
-        calendar_end_at: selectedDate ? null : undefined,
-        calendar_all_day: selectedDate ? true : undefined,
-      })
+        calendar_start_at: calendarStartAt,
+        calendar_end_at: calendarEndAt,
+        calendar_all_day: false,
+        appointment_status: statusOptions[statusIndex].value,
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone.trim(),
+        service_name: serviceName.trim(),
+      });
 
       if (remindAt) {
         await createReminder(record.id, {
           remind_at: remindAt,
           repeat_type: repeatOptions[repeatIndex].value,
-        })
+        });
       }
 
-      Taro.hideLoading()
+      Taro.hideLoading();
 
       Taro.showToast({
-        title: '创建成功',
-        icon: 'success',
-      })
+        title: "创建成功",
+        icon: "success",
+      });
 
       setTimeout(() => {
         if (selectedDate) {
           Taro.redirectTo({
-            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${selectedDate}`,
-          })
-          return
+            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${finalAppointmentDate}`,
+          });
+          return;
         }
 
         Taro.redirectTo({
           url: `/pages/record-detail/index?id=${record.id}`,
-        })
-      }, 500)
+        });
+      }, 500);
     } catch (err) {
-      console.error(err)
-      Taro.hideLoading()
+      console.error(err);
+      Taro.hideLoading();
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   return (
-    <View className='container'>
-      <View className='page-title'>创建记录</View>
-      <View className='page-desc'>
-        快速创建协同记录，可设置截止时间和提醒时间。
-        {selectedDate ? ` 当前日历日期：${selectedDate}` : ''}
+    <View className="container">
+      <View className="page-title">新建预约日程</View>
+      <View className="page-desc">
+        快速创建客户预约，默认带入选中日期、当前用户和提醒时间。
+        {selectedDate ? ` 当前日历日期：${selectedDate}` : ""}
       </View>
 
-      <View className='form-card'>
-        <View className='form-item'>
-          <Text className='form-label'>所属日历</Text>
+      <View className="form-card">
+        <View className="form-item">
+          <Text className="form-label">所属日历</Text>
 
           {calendars.length === 0 ? (
-            <View className='empty-calendar-guide'>
-              <View className='empty-calendar-title'>暂无可创建记录的日历</View>
-              <View className='empty-calendar-desc'>
+            <View className="empty-calendar-guide">
+              <View className="empty-calendar-title">暂无可创建记录的日历</View>
+              <View className="empty-calendar-desc">
                 你需要先创建一个日历，或者加入有创建权限的日历，才能添加记录。
               </View>
 
               <View
-                className='empty-calendar-btn'
+                className="empty-calendar-btn"
                 onClick={() => {
                   Taro.navigateTo({
-                    url: '/pages/calendar-create/index',
-                  })
+                    url: "/pages/calendar-create/index",
+                  });
                 }}
               >
                 去创建日历
@@ -351,77 +462,108 @@ export default function RecordCreatePage() {
             </View>
           ) : (
             <Picker
-              mode='selector'
+              mode="selector"
               range={calendarNames}
               value={selectedCalendarIndex >= 0 ? selectedCalendarIndex : 0}
               onChange={(e) => {
-                const index = Number(e.detail.value)
-                const selected = calendars[index]
+                const index = Number(e.detail.value);
+                const selected = calendars[index];
 
                 if (selected) {
-                  setCalendarId(selected.id)
+                  setCalendarId(selected.id);
                 }
               }}
             >
-              <View className='picker-value'>
-                {selectedCalendar?.name || '请选择日历'}
+              <View className="picker-value">
+                {selectedCalendar?.name || "请选择日历"}
               </View>
             </Picker>
           )}
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>标题</Text>
+        <View className="form-item">
+          <Text className="form-label">客户姓名</Text>
           <Input
-            className='form-input'
+            className="form-input"
+            value={customerName}
+            placeholder="例如：客户A"
+            maxlength={128}
+            onInput={(e) => setCustomerName(e.detail.value)}
+          />
+        </View>
+
+        <View className="form-item">
+          <Text className="form-label">客户手机号（可选）</Text>
+          <Input
+            className="form-input"
+            value={customerPhone}
+            placeholder="例如：138xxxx8888"
+            maxlength={32}
+            onInput={(e) => setCustomerPhone(e.detail.value)}
+          />
+        </View>
+
+        <View className="form-item">
+          <Text className="form-label">服务项目（可选）</Text>
+          <Input
+            className="form-input"
+            value={serviceName}
+            placeholder="例如：美甲护理"
+            maxlength={128}
+            onInput={(e) => setServiceName(e.detail.value)}
+          />
+        </View>
+
+        <View className="form-item">
+          <Text className="form-label">标题</Text>
+          <Input
+            className="form-input"
             value={title}
-            placeholder='例如：明天联系客户确认需求'
+            placeholder="例如：客户A 美甲护理，可留空自动生成"
             maxlength={200}
             onInput={(e) => setTitle(e.detail.value)}
           />
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>内容</Text>
+        <View className="form-item">
+          <Text className="form-label">备注</Text>
           <Textarea
-            className='form-textarea'
+            className="form-textarea"
             value={content}
-            placeholder='补充说明、处理要求、注意事项等'
+            placeholder="历史偏好、注意事项、补款等备注"
             maxlength={1000}
             onInput={(e) => setContent(e.detail.value)}
           />
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>负责人</Text>
+        <View className="form-item">
+          <Text className="form-label">负责人</Text>
 
           {memberOptions.length === 0 ? (
-            <View className='empty-member'>暂无成员可选</View>
+            <View className="empty-member">暂无成员可选</View>
           ) : (
             <Picker
-              mode='selector'
+              mode="selector"
               range={memberOptions.map((item) => item.label)}
               value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0}
               onChange={(e) => {
-                const index = Number(e.detail.value)
-                const selected = memberOptions[index]
+                const index = Number(e.detail.value);
+                const selected = memberOptions[index];
 
                 if (selected) {
-                  setAssigneeId(selected.value)
+                  setAssigneeId(selected.value);
                 }
               }}
             >
-              <View className='picker-value'>
-                {selectedAssigneeName}
-              </View>
+              <View className="picker-value">{selectedAssigneeName}</View>
             </Picker>
           )}
 
           {assigneeId && (
             <View
-              className='clear-time'
+              className="clear-time"
               onClick={() => {
-                setAssigneeId(undefined)
+                setAssigneeId(undefined);
               }}
             >
               清除负责人
@@ -429,26 +571,76 @@ export default function RecordCreatePage() {
           )}
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>截止时间</Text>
+        <View className="form-item">
+          <Text className="form-label">预约日期</Text>
+          <Picker
+            mode="date"
+            value={appointmentDate}
+            onChange={(e) => {
+              const value = String(e.detail.value);
+              setAppointmentDate(value);
+              setDueDate(value);
+              if (!isSameDay(value)) setRemindDate(addDays(value, -1));
+            }}
+          >
+            <View className="datetime-picker">{appointmentDate}</View>
+          </Picker>
+        </View>
 
-          <View className='datetime-row'>
+        <View className="form-item">
+          <Text className="form-label">开始 / 结束时间</Text>
+          <View className="datetime-row">
             <Picker
-              mode='date'
+              mode="time"
+              value={startTime}
+              onChange={(e) => setStartTime(String(e.detail.value))}
+            >
+              <View className="datetime-picker">{startTime}</View>
+            </Picker>
+            <Picker
+              mode="time"
+              value={endTime}
+              onChange={(e) => setEndTime(String(e.detail.value))}
+            >
+              <View className="datetime-picker">{endTime}</View>
+            </Picker>
+          </View>
+        </View>
+
+        <View className="form-item">
+          <Text className="form-label">状态</Text>
+          <Picker
+            mode="selector"
+            range={statusOptions.map((item) => item.label)}
+            value={statusIndex}
+            onChange={(e) => setStatusIndex(Number(e.detail.value))}
+          >
+            <View className="picker-value">
+              {statusOptions[statusIndex].label}
+            </View>
+          </Picker>
+        </View>
+
+        <View className="form-item">
+          <Text className="form-label">截止时间</Text>
+
+          <View className="datetime-row">
+            <Picker
+              mode="date"
               value={dueDate || defaultDueDate}
               onChange={(e) => setDueDate(String(e.detail.value))}
             >
-              <View className='datetime-picker'>
+              <View className="datetime-picker">
                 {dueDate || defaultDueDate}
               </View>
             </Picker>
 
             <Picker
-              mode='time'
+              mode="time"
               value={dueTime || DEFAULT_DUE_TIME}
               onChange={(e) => setDueTime(String(e.detail.value))}
             >
-              <View className='datetime-picker'>
+              <View className="datetime-picker">
                 {dueTime || DEFAULT_DUE_TIME}
               </View>
             </Picker>
@@ -456,10 +648,10 @@ export default function RecordCreatePage() {
 
           {(dueDate || dueTime) && (
             <View
-              className='clear-time'
+              className="clear-time"
               onClick={() => {
-                setDueDate(defaultDueDate)
-                setDueTime(DEFAULT_DUE_TIME)
+                setDueDate(defaultDueDate);
+                setDueTime(DEFAULT_DUE_TIME);
               }}
             >
               清除截止时间
@@ -467,26 +659,26 @@ export default function RecordCreatePage() {
           )}
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>提醒时间</Text>
+        <View className="form-item">
+          <Text className="form-label">提醒时间</Text>
 
-          <View className='datetime-row'>
+          <View className="datetime-row">
             <Picker
-              mode='date'
+              mode="date"
               value={remindDate || defaultRemindDate}
               onChange={(e) => setRemindDate(String(e.detail.value))}
             >
-              <View className='datetime-picker'>
+              <View className="datetime-picker">
                 {remindDate || defaultRemindDate}
               </View>
             </Picker>
 
             <Picker
-              mode='time'
+              mode="time"
               value={remindTime || DEFAULT_REMIND_TIME}
               onChange={(e) => setRemindTime(String(e.detail.value))}
             >
-              <View className='datetime-picker'>
+              <View className="datetime-picker">
                 {remindTime || DEFAULT_REMIND_TIME}
               </View>
             </Picker>
@@ -494,10 +686,10 @@ export default function RecordCreatePage() {
 
           {(remindDate || remindTime) && (
             <View
-              className='clear-time'
+              className="clear-time"
               onClick={() => {
-                setRemindDate(defaultRemindDate)
-                setRemindTime(DEFAULT_REMIND_TIME)
+                setRemindDate(defaultRemindDate);
+                setRemindTime(DEFAULT_REMIND_TIME);
               }}
             >
               清除提醒时间
@@ -505,16 +697,16 @@ export default function RecordCreatePage() {
           )}
         </View>
 
-        <View className='form-item'>
-          <Text className='form-label'>重复提醒</Text>
+        <View className="form-item">
+          <Text className="form-label">重复提醒</Text>
 
           <Picker
-            mode='selector'
+            mode="selector"
             range={repeatOptions.map((item) => item.label)}
             value={repeatIndex}
             onChange={(e) => setRepeatIndex(Number(e.detail.value))}
           >
-            <View className='picker-value'>
+            <View className="picker-value">
               {repeatOptions[repeatIndex].label}
             </View>
           </Picker>
@@ -522,11 +714,11 @@ export default function RecordCreatePage() {
       </View>
 
       <View
-        className={submitting ? 'submit-btn disabled' : 'submit-btn'}
+        className={submitting ? "submit-btn disabled" : "submit-btn"}
         onClick={handleSubmit}
       >
-        {submitting ? '创建中...' : '创建记录'}
+        {submitting ? "创建中..." : "创建预约"}
       </View>
     </View>
-  )
+  );
 }

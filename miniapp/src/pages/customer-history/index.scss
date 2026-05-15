@@ -1,0 +1,29 @@
+.history-head,
+.history-card,
+.empty-box {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px;
+  margin-bottom: 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.history-title {
+  font-size: 30px;
+  font-weight: 900;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.history-meta,
+.history-content,
+.empty-box {
+  font-size: 24px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.history-content {
+  margin-top: 12px;
+  color: #374151;
+}
