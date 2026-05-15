@@ -15,44 +15,29 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 16px;
 }
 
-.nav-calendar-name {
+.nav-calendar-pill {
+  max-width: 340px;
+  height: 60px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #111827;
+  font-size: 27px;
+  font-weight: 800;
   display: flex;
   align-items: center;
-  min-width: 0;
-  max-width: 430px;
-  padding: 14px 18px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.nav-calendar-label {
-  flex-shrink: 0;
-  margin-right: 10px;
-  color: #64748b;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.nav-calendar-text {
-  min-width: 0;
-  color: #111827;
-  font-size: 30px;
-  font-weight: 900;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
-.nav-calendar-arrow {
-  flex-shrink: 0;
-  margin-left: 8px;
-  color: #1677ff;
-  font-size: 28px;
-  font-weight: 900;
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .nav-account {
@@ -91,30 +76,18 @@
   text-overflow: ellipsis;
 }
 
-.nav-action-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.nav-action-btn {
+.nav-config-btn {
+  width: 60px;
+  height: 60px;
   border-radius: 999px;
-  padding: 16px 12px;
-  text-align: center;
-  background: #eef5ff;
-  color: #1677ff;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.nav-action-btn.primary {
-  background: #1677ff;
-  color: #ffffff;
-}
-
-.nav-action-btn.green {
-  background: #ecfdf5;
-  color: #059669;
+  background: #ffffff;
+  color: #374151;
+  font-size: 30px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .month-head,
@@ -165,6 +138,12 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 10px;
+}
+
+.calendar-hint {
+  margin: 0 0 14px;
+  font-size: 23px;
+  color: #6b7280;
 }
 
 .weekday-row {
@@ -424,8 +403,7 @@
 }
 
 .filter-card,
-.stats-card,
-.quick-status-card {
+.stats-card {
   background: #ffffff;
   border-radius: 22px;
   padding: 20px;
@@ -537,35 +515,6 @@
   color: #94a3b8;
   font-size: 22px;
   margin-top: 6px;
-}
-
-.quick-status-card {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.quick-status-btn {
-  border-radius: 16px;
-  padding: 18px 8px;
-  text-align: center;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.quick-status-btn.rest {
-  background: #cffafe;
-  color: #0891b2;
-}
-
-.quick-status-btn.blocked {
-  background: #f1f5f9;
-  color: #64748b;
-}
-
-.quick-status-btn.full {
-  background: #dcfce7;
-  color: #16a34a;
 }
 
 .timeline-card {

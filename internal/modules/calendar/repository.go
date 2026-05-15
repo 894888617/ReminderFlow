@@ -485,6 +485,19 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 		return nil, ErrNoPermission
 	}
 
+	startAt := params.Date
+	allDay := true
+	if params.EventType == "blocked" && params.StartTime != "" {
+		parsed, err := time.Parse("15:04", params.StartTime)
+		if err != nil {
+			return nil, err
+		}
+		startAt = time.Date(params.Date.Year(), params.Date.Month(), params.Date.Day(), parsed.Hour(), parsed.Minute(), 0, 0, params.Date.Location())
+		allDay = false
+	} else if params.EventType == "blocked" {
+		allDay = params.AllDay
+	}
+
 	var existing int64
 	err := r.db.QueryRow(ctx, `
 		SELECT id
@@ -499,7 +512,7 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 	if err == nil {
 		items, listErr := r.ListCalendarEvents(ctx, userID, calendarID, params.Date, params.Date.AddDate(0, 0, 1), CalendarEventFilters{EventType: params.EventType})
 		if listErr != nil || len(items) == 0 {
-			return &CalendarEvent{ID: existing, EventID: existing, CalendarID: calendarID, Title: title, Status: params.EventType, EventType: params.EventType, StartAt: formatShanghaiTimestamp(params.Date), AllDay: true}, listErr
+			return &CalendarEvent{ID: existing, EventID: existing, CalendarID: calendarID, Title: title, Status: params.EventType, EventType: params.EventType, StartAt: formatShanghaiTimestamp(startAt), AllDay: allDay}, listErr
 		}
 		return &items[0], nil
 	}
@@ -511,11 +524,11 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 	var start time.Time
 	err = r.db.QueryRow(ctx, `
 		INSERT INTO calendar_events (
-			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by
+			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by, content
 		)
-		VALUES ($1, $2, $3, NULL, true, 'Asia/Shanghai', $4, $4, $5)
+		VALUES ($1, $2, $3, NULL, $4, 'Asia/Shanghai', $5, $5, $6, $7)
 		RETURNING id, calendar_id, title, status, event_type, start_at, all_day
-	`, calendarID, title, params.Date, params.EventType, userID).Scan(
+	`, calendarID, title, startAt, allDay, params.EventType, userID, strings.TrimSpace(params.Remark)).Scan(
 		&item.EventID,
 		&item.CalendarID,
 		&item.Title,

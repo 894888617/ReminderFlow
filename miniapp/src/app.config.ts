@@ -9,6 +9,7 @@ export default defineAppConfig({
     "pages/calendar-members/index",
     "pages/invite-accept/index",
     "pages/record-create/index",
+    "pages/schedule-special/index",
     "pages/customer-history/index",
     "pages/record-detail/index",
     "pages/record-edit/index",
