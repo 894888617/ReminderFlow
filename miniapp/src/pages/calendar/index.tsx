@@ -267,7 +267,7 @@ export default function CalendarPage() {
     setEvents(data.items || []);
   };
 
-  const loadData = async (preferredId = currentCalendarId) => {
+  const loadData = async (preferredId = currentCalendarId, baseDate = currentDate) => {
     if (!getStoredToken()) {
       Taro.redirectTo({ url: "/pages/login/index" });
       return;
@@ -286,8 +286,8 @@ export default function CalendarPage() {
         Taro.setStorageSync(SELECTED_CALENDAR_KEY, nextId);
         await Promise.all([
           loadMembers(nextId),
-          loadEvents(nextId),
-          loadStats(nextId),
+          loadEvents(nextId, baseDate),
+          loadStats(nextId, baseDate),
         ]);
       } else {
         setEvents([]);
@@ -320,12 +320,14 @@ export default function CalendarPage() {
       returnContext?.calendar_id || routeCalendarId || currentCalendarId,
     );
 
+    const nextDate = nextSelectedDate
+      ? parseDate(nextSelectedDate)
+      : currentDate;
     if (nextSelectedDate) {
-      const nextDate = parseDate(nextSelectedDate);
       setSelectedDate(nextSelectedDate);
       setCurrentDate(nextDate);
     }
-    loadData(nextCalendarId);
+    loadData(nextCalendarId, nextDate);
   });
 
   const changeCalendar = async (calendarId: number) => {

@@ -26,13 +26,19 @@ func (h *Handler) Today(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		response.Internal(c, "load timezone failed")
+		return
+	}
+
+	now := time.Now().In(loc)
 	start := time.Date(
 		now.Year(),
 		now.Month(),
 		now.Day(),
 		0, 0, 0, 0,
-		now.Location(),
+		loc,
 	)
 	end := start.AddDate(0, 0, 1)
 
