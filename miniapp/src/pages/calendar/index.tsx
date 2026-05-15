@@ -3,6 +3,7 @@ import Taro, { useDidShow, usePullDownRefresh, useRouter } from "@tarojs/taro";
 import { useMemo, useState } from "react";
 
 import {
+  deleteCalendarEvent,
   getMemberWorkloadStats,
   getMonthlyCalendarStats,
   listCalendarEvents,
@@ -36,7 +37,7 @@ const statusOptions = [
   { label: "已逾期", value: "overdue" },
   { label: "休息", value: "rest" },
   { label: "不接", value: "blocked" },
-  { label: "满", value: "full" },
+  { label: "已满", value: "full" },
 ];
 
 function formatDate(date: Date) {
@@ -100,7 +101,7 @@ function getStatusText(status?: string | null, eventType?: string | null) {
     overdue: "已逾期",
     rest: "休息",
     blocked: "不接",
-    full: "满",
+    full: "已满",
   };
   return map[normalized] || "待处理";
 }
@@ -116,17 +117,34 @@ function getEventDate(event: CalendarEvent) {
 }
 
 function getEventTime(event: CalendarEvent) {
-  if (event.all_day || ["rest", "full"].includes(getEventStatus(event)))
-    return "全天";
-  return (event.start_at || "").slice(11, 16) || "--:--";
+  const status = getEventStatus(event);
+  if (event.all_day || ["rest", "full"].includes(status)) return "全天";
+  const start = (event.start_at || "").slice(11, 16) || "--:--";
+  const end = (event.end_at || "").slice(11, 16);
+  return status === "blocked" && end ? `${start}-${end}` : start;
+}
+
+function getSpecialEventLabel(event: CalendarEvent) {
+  const status = getEventStatus(event);
+  const name = event.assignee_name || "未指定负责人";
+  if (status === "rest") return `${name}休息`;
+  if (status === "blocked") {
+    const start = (event.start_at || "").slice(11, 16);
+    const end = (event.end_at || "").slice(11, 16);
+    return `${name}不接${start && end ? ` ${start} - ${end}` : ""}`;
+  }
+  if (status === "full") return `${name}已满`;
+  return "";
 }
 
 function getEventTitle(event: CalendarEvent) {
-  const status = getEventStatus(event);
-  if (status === "rest") return "休息";
-  if (status === "blocked") return "不接";
-  if (status === "full") return "已满";
+  const specialLabel = getSpecialEventLabel(event);
+  if (specialLabel) return specialLabel;
   return event.title || "未命名日程";
+}
+
+function isSpecialEvent(event: CalendarEvent) {
+  return ["rest", "blocked", "full"].includes(getEventStatus(event));
 }
 
 export default function CalendarPage() {
@@ -375,8 +393,13 @@ export default function CalendarPage() {
       Taro.showToast({ title: "你只有查看权限", icon: "none" });
       return;
     }
+    const selectedAssignee =
+      assigneeFilter || (currentUser?.id ? String(currentUser.id) : "");
+    const assigneeQuery = selectedAssignee
+      ? `&assignee_id=${selectedAssignee}`
+      : "";
     Taro.navigateTo({
-      url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&type=${type}`,
+      url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&type=${type}${assigneeQuery}`,
     });
   };
 
@@ -450,6 +473,31 @@ export default function CalendarPage() {
   const goProfile = () => {
     Taro.navigateTo({ url: "/pages/profile/index" });
   };
+  const handleDeleteSpecialEvent = (item: CalendarEvent) => {
+    if (!item.id) {
+      Taro.showToast({ title: "状态记录缺少 ID", icon: "none" });
+      return;
+    }
+
+    Taro.showModal({
+      title: "确认删除状态",
+      content: `确定删除${getEventTitle(item)}吗？`,
+      success: async (res) => {
+        if (!res.confirm) return;
+        try {
+          Taro.showLoading({ title: "删除中", mask: true });
+          await deleteCalendarEvent(item.id);
+          await loadEvents(currentCalendarId);
+          Taro.hideLoading();
+          Taro.showToast({ title: "删除成功", icon: "success" });
+        } catch (err) {
+          console.error(err);
+          Taro.hideLoading();
+          Taro.showToast({ title: "删除失败", icon: "none" });
+        }
+      },
+    });
+  };
 
   const renderCustomNav = () => (
     <View className="custom-nav">
@@ -469,7 +517,7 @@ export default function CalendarPage() {
           </View>
         </Picker>
 
-        <View className="nav-right">
+        <View className="nav-actions-center">
           <View className="nav-account" onClick={goProfile}>
             <View className="nav-account-avatar">{accountAvatarText}</View>
             <View className="nav-account-text">{accountText}</View>
@@ -508,10 +556,11 @@ export default function CalendarPage() {
             <View className="timeline-time">{getEventTime(item)}</View>
             <View className="timeline-main">
               <View className="record-title">{getEventTitle(item)}</View>
-              <View className="record-assignee-name">
-                {item.assignee_name ||
-                  (getEventStatus(item) === "blocked" ? "不接单" : "未分配")}
-              </View>
+              {!isSpecialEvent(item) ? (
+                <View className="record-assignee-name">
+                  {item.assignee_name || "未分配"}
+                </View>
+              ) : null}
               {item.record_id ? (
                 <View
                   className="history-link"
@@ -528,8 +577,21 @@ export default function CalendarPage() {
                 </View>
               ) : null}
             </View>
-            <View className={`record-status status-${getEventStatus(item)}`}>
-              {getStatusText(item.status, item.event_type)}
+            <View className="timeline-actions">
+              <View className={`record-status status-${getEventStatus(item)}`}>
+                {getStatusText(item.status, item.event_type)}
+              </View>
+              {isSpecialEvent(item) && writable ? (
+                <View
+                  className="delete-status-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteSpecialEvent(item);
+                  }}
+                >
+                  删除
+                </View>
+              ) : null}
             </View>
           </View>
         ))}

@@ -387,7 +387,7 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 	argIndex := 5
 
 	if filters.AssigneeID != nil {
-		whereParts = append(whereParts, fmt.Sprintf("rec.assignee_id = $%d", argIndex))
+		whereParts = append(whereParts, fmt.Sprintf("COALESCE(rec.assignee_id, ce.assignee_id) = $%d", argIndex))
 		args = append(args, *filters.AssigneeID)
 		argIndex++
 	}
@@ -412,8 +412,8 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			COALESCE(rec.content, ''),
 			%s,
 			LOWER(COALESCE(ce.event_type, 'record')),
-			rec.assignee_id,
-			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
+			COALESCE(rec.assignee_id, ce.assignee_id),
+			COALESCE(NULLIF(u.nickname, ''), NULLIF(su.nickname, ''), u.username, su.username, ''),
 			ce.start_at,
 			ce.end_at,
 			ce.all_day
@@ -424,6 +424,7 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			AND cm.status = 'active'
 		LEFT JOIN records rec ON rec.id = ce.record_id
 		LEFT JOIN users u ON u.id = rec.assignee_id
+		LEFT JOIN users su ON su.id = ce.assignee_id
 		WHERE %s
 		ORDER BY
 			CASE WHEN LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full') THEN 0 ELSE 1 END,
@@ -478,6 +479,9 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 	if err := r.EnsureCalendarEditable(ctx, userID, calendarID); err != nil {
 		return nil, err
 	}
+	if _, err := r.GetUserRole(ctx, params.AssigneeID, calendarID); err != nil {
+		return nil, err
+	}
 
 	titleMap := map[string]string{"rest": "休息", "blocked": "不接", "full": "已满"}
 	title := titleMap[params.EventType]
@@ -486,55 +490,41 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 	}
 
 	startAt := params.Date
+	var endAt *time.Time
 	allDay := true
-	if params.EventType == "blocked" && params.StartTime != "" {
-		parsed, err := time.Parse("15:04", params.StartTime)
+	if params.EventType == "blocked" {
+		parsedStart, err := time.Parse("15:04", params.StartTime)
 		if err != nil {
 			return nil, err
 		}
-		startAt = time.Date(params.Date.Year(), params.Date.Month(), params.Date.Day(), parsed.Hour(), parsed.Minute(), 0, 0, params.Date.Location())
-		allDay = false
-	} else if params.EventType == "blocked" {
-		allDay = params.AllDay
-	}
-
-	var existing int64
-	err := r.db.QueryRow(ctx, `
-		SELECT id
-		FROM calendar_events
-		WHERE calendar_id = $1
-		  AND deleted_at IS NULL
-		  AND LOWER(COALESCE(event_type, 'record')) = $2
-		  AND start_at >= $3
-		  AND start_at < $4
-		LIMIT 1
-	`, calendarID, params.EventType, params.Date, params.Date.AddDate(0, 0, 1)).Scan(&existing)
-	if err == nil {
-		items, listErr := r.ListCalendarEvents(ctx, userID, calendarID, params.Date, params.Date.AddDate(0, 0, 1), CalendarEventFilters{EventType: params.EventType})
-		if listErr != nil || len(items) == 0 {
-			return &CalendarEvent{ID: existing, EventID: existing, CalendarID: calendarID, Title: title, Status: params.EventType, EventType: params.EventType, StartAt: formatShanghaiTimestamp(startAt), AllDay: allDay}, listErr
+		parsedEnd, err := time.Parse("15:04", params.EndTime)
+		if err != nil {
+			return nil, err
 		}
-		return &items[0], nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+		startAt = time.Date(params.Date.Year(), params.Date.Month(), params.Date.Day(), parsedStart.Hour(), parsedStart.Minute(), 0, 0, params.Date.Location())
+		end := time.Date(params.Date.Year(), params.Date.Month(), params.Date.Day(), parsedEnd.Hour(), parsedEnd.Minute(), 0, 0, params.Date.Location())
+		endAt = &end
+		allDay = false
 	}
 
 	var item CalendarEvent
 	var start time.Time
-	err = r.db.QueryRow(ctx, `
+	var end *time.Time
+	err := r.db.QueryRow(ctx, `
 		INSERT INTO calendar_events (
-			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by, content
+			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by, assignee_id, content
 		)
-		VALUES ($1, $2, $3, NULL, $4, 'Asia/Shanghai', $5, $5, $6, $7)
-		RETURNING id, calendar_id, title, status, event_type, start_at, all_day
-	`, calendarID, title, startAt, allDay, params.EventType, userID, strings.TrimSpace(params.Remark)).Scan(
+		VALUES ($1, $2, $3, $4, $5, 'Asia/Shanghai', $6, $6, $7, $8, $9)
+		RETURNING id, calendar_id, title, status, event_type, assignee_id, start_at, end_at, all_day
+	`, calendarID, title, startAt, endAt, allDay, params.EventType, userID, params.AssigneeID, strings.TrimSpace(params.Remark)).Scan(
 		&item.EventID,
 		&item.CalendarID,
 		&item.Title,
 		&item.Status,
 		&item.EventType,
+		&item.AssigneeID,
 		&start,
+		&end,
 		&item.AllDay,
 	)
 	if err != nil {
@@ -542,6 +532,10 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 	}
 	item.ID = item.EventID
 	item.StartAt = formatShanghaiTimestamp(start)
+	if end != nil {
+		formatted := formatShanghaiTimestamp(*end)
+		item.EndAt = &formatted
+	}
 	item.CurrentUserRole = RoleMember
 	return &item, nil
 }

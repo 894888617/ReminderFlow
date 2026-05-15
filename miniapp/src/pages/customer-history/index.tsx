@@ -44,13 +44,6 @@ export default function CustomerHistoryPage() {
 
   return (
     <View className="container">
-      <View className="history-head">
-        <View className="page-title">客户历史</View>
-        <View className="page-desc">
-          关键词：{keyword || "未提供"} ｜ 历史预约 {items.length} 条
-        </View>
-      </View>
-
       {loading ? <View className="empty-box">加载中...</View> : null}
 
       {!loading && items.length === 0 ? (

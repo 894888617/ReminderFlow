@@ -300,12 +300,6 @@ export default function RecordCreatePage() {
 
   return (
     <View className="container">
-      <View className="page-title">新建预约日程</View>
-      <View className="page-desc">
-        快速创建客户预约，默认带入选中日期和当前用户。
-        {selectedDate ? ` 当前日历日期：${selectedDate}` : ""}
-      </View>
-
       <View className="form-card">
         <View className="form-item">
           <Text className="form-label">所属日历</Text>

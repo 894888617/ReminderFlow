@@ -65,11 +65,6 @@ export default function CalendarCreatePage() {
   return (
     <View className='container'>
       <View className='create-header'>
-        <View>
-          <View className='page-title'>创建日历</View>
-          <View className='page-desc'>创建一个共享日历，用于管理记录、提醒和成员。</View>
-        </View>
-
         <View className='back-btn' onClick={() => Taro.navigateBack()}>
           返回
         </View>

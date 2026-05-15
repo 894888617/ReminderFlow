@@ -140,13 +140,6 @@ export default function CalendarDetailPage() {
 
   return (
     <View className='container'>
-      <View className='detail-header'>
-        <View>
-          <View className='page-title'>{calendar?.name || '日历详情'}</View>
-          <View className='page-desc'>角色：{roleText(role)} ｜ 成员 {calendar?.member_count || 0} 人</View>
-        </View>
-      </View>
-
       <View className='form-card'>
         <View className='form-item'>
           <Text className='form-label'>日历名称</Text>

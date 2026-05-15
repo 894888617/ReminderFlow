@@ -146,11 +146,6 @@ export default function TodoPage() {
 
   return (
     <View className='container'>
-      <View className='page-title'>今日待办</View>
-      <View className='page-desc'>
-        {data?.date ? `日期：${data.date}` : '今日截止、今日提醒和未完成任务。'}
-      </View>
-
       <View className='todo-summary'>
         <View className='summary-item'>
           <Text className='summary-value'>{dueToday.length}</Text>

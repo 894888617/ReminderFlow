@@ -130,9 +130,6 @@ export default function ProfilePage() {
 
   return (
     <View className='container'>
-      <View className='page-title'>我的</View>
-      <View className='page-desc'>账号信息和系统设置。</View>
-
       <View className='card account-card'>
         <Text className='account-name'>用户：{getWechatDisplayName(user)}</Text>
 
