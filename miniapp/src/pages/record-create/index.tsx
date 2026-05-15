@@ -19,9 +19,9 @@ import "./index.scss";
 
 const statusOptions = RECORD_STATUS_OPTIONS;
 
-function buildDateTime(date: string, time: string) {
-  if (!date || !time) return undefined;
-  return `${date}T${time}:00+08:00`;
+function buildDateTime(date: string, time = "00:00") {
+  if (!date) return undefined;
+  return `${date}T${time || "00:00"}:00+08:00`;
 }
 
 function todayDate() {
@@ -232,9 +232,8 @@ export default function RecordCreatePage() {
 
     const finalAppointmentDate = appointmentDate || defaultAppointmentDate;
     const finalStartTime = startTime.trim();
-    const calendarStartAt = finalStartTime
-      ? buildDateTime(finalAppointmentDate, finalStartTime)
-      : undefined;
+    const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
+    const isAllDayAppointment = !finalStartTime;
 
     try {
       setSubmitting(true);
@@ -257,9 +256,10 @@ export default function RecordCreatePage() {
           .filter(Boolean)
           .join("\n"),
         assignee_id: assigneeId,
+        due_at: calendarStartAt,
         calendar_start_at: calendarStartAt,
         calendar_end_at: null,
-        calendar_all_day: false,
+        calendar_all_day: isAllDayAppointment,
         appointment_status: statusOptions[statusIndex].value,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
@@ -275,8 +275,13 @@ export default function RecordCreatePage() {
 
       setTimeout(() => {
         if (selectedDate) {
+          Taro.setStorageSync("calendar_return_context", {
+            calendar_id: calendarId,
+            selected_date: finalAppointmentDate,
+            refresh_at: Date.now(),
+          });
           Taro.redirectTo({
-            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${selectedDate}`,
+            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${finalAppointmentDate}`,
           });
           return;
         }
