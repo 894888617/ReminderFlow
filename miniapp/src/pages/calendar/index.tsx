@@ -19,9 +19,14 @@ import {
 } from "../../api/calendar";
 import { canCreateRecord, canViewMembers } from "../../utils/permission";
 import { getStoredToken, getStoredUser } from "../../utils/auth";
-import { getUserNameDisplay } from "../../utils/userDisplay";
+import { getUserNameDisplay, getWechatDisplayName } from "../../utils/userDisplay";
 
 import "./index.scss";
+
+definePageConfig({
+  navigationStyle: "custom",
+  enablePullDownRefresh: true,
+});
 
 const SELECTED_CALENDAR_KEY = "selected_calendar_id";
 
@@ -215,6 +220,11 @@ export default function CalendarPage() {
     [eventsByDate, selectedDate],
   );
 
+  const navTitle = selectedCalendar?.name || "客户预约";
+  const accountName = getWechatDisplayName(currentUser);
+  const accountText = accountName && accountName !== "-" ? accountName : "我的";
+  const accountAvatarText = accountText === "我的" ? "我" : accountText.slice(0, 1);
+
   const loadMembers = async (calendarId: number) => {
     if (!calendarId) {
       setMembers([]);
@@ -378,6 +388,20 @@ export default function CalendarPage() {
     }
   };
 
+  const goProfile = () => {
+    Taro.navigateTo({ url: "/pages/profile/index" });
+  };
+
+  const renderCustomNav = () => (
+    <View className="custom-nav">
+      <View className="nav-title">{navTitle}</View>
+      <View className="nav-account" onClick={goProfile}>
+        <View className="nav-account-avatar">{accountAvatarText}</View>
+        <View className="nav-account-text">{accountText}</View>
+      </View>
+    </View>
+  );
+
   const handleDeleteCalendar = (calendar: Calendar) => {
     if (normalizeCalendarRole(calendar) !== "owner") {
       Taro.showToast({ title: "只有所有者可以删除日历", icon: "none" });
@@ -468,7 +492,8 @@ export default function CalendarPage() {
 
   if (!loading && calendars.length === 0) {
     return (
-      <View className="container">
+      <View className="container calendar-container">
+        {renderCustomNav()}
         <View className="calendar-header">
           <View>
             <View className="page-title">日历</View>
@@ -499,7 +524,8 @@ export default function CalendarPage() {
   }
 
   return (
-    <View className="container">
+    <View className="container calendar-container">
+      {renderCustomNav()}
       <View className="calendar-header slim">
         <View>
           <View className="page-title">

@@ -413,7 +413,7 @@ export default function RecordCreatePage() {
       setTimeout(() => {
         if (selectedDate) {
           Taro.redirectTo({
-            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${finalAppointmentDate}`,
+            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${selectedDate}`,
           });
           return;
         }

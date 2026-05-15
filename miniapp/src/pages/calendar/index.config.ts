@@ -1,4 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '日历',
+  navigationStyle: 'custom',
   enablePullDownRefresh: true,
 })

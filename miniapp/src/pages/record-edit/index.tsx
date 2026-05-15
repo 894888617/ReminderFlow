@@ -262,7 +262,7 @@ export default function RecordEditPage() {
                 url: `/pages/calendar-detail/index?id=${record.workspace_id}`,
               })
             } else {
-              Taro.switchTab({
+              Taro.redirectTo({
                 url: '/pages/calendar/index',
               })
             }
