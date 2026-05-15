@@ -1,16 +1,5 @@
+import { normalizeRecordStatus, type RecordStatus } from "../utils/recordStatus";
 import { request } from "./request";
-
-export type RecordStatus =
-  | "PENDING"
-  | "IN_PROGRESS"
-  | "DONE"
-  | "OVERDUE"
-  | "CANCELLED"
-  | "pending"
-  | "confirmed"
-  | "in_progress"
-  | "done"
-  | "cancelled";
 
 export interface RecordItem {
   id: number;
@@ -59,13 +48,23 @@ function buildQuery(params: RecordQueryParams) {
   return query.join("&");
 }
 
+function normalizeRecordItem(item: RecordItem): RecordItem {
+  return {
+    ...item,
+    status: normalizeRecordStatus(item.status),
+  };
+}
+
 export function getRecords(params: RecordQueryParams) {
   const query = buildQuery(params);
 
   return request<PageResult<RecordItem>>({
     url: `/api/records?${query}`,
     method: "GET",
-  });
+  }).then((data) => ({
+    ...data,
+    items: (data.items || []).map(normalizeRecordItem),
+  }));
 }
 
 export interface CreateRecordParams {
@@ -90,7 +89,7 @@ export function createRecord(data: CreateRecordParams) {
     url: "/api/records",
     method: "POST",
     data,
-  });
+  }).then(normalizeRecordItem);
 }
 
 export interface OperationLog {
@@ -108,7 +107,7 @@ export function getRecordDetail(id: number) {
   return request<RecordItem>({
     url: `/api/records/${id}`,
     method: "GET",
-  });
+  }).then(normalizeRecordItem);
 }
 
 export function updateRecordStatus(id: number, status: RecordStatus) {
@@ -118,7 +117,7 @@ export function updateRecordStatus(id: number, status: RecordStatus) {
     data: {
       status,
     },
-  });
+  }).then(normalizeRecordItem);
 }
 
 export function getRecordLogs(id: number) {
@@ -140,7 +139,7 @@ export function updateRecord(id: number, data: UpdateRecordParams) {
     url: `/api/records/${id}`,
     method: "PUT",
     data,
-  });
+  }).then(normalizeRecordItem);
 }
 
 export function deleteRecord(id: number) {

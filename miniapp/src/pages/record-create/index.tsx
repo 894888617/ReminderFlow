@@ -14,15 +14,10 @@ import { canCreateRecord } from "../../utils/permission";
 
 import { getStoredToken, getStoredUser } from "../../utils/auth";
 import { getUserNameDisplay } from "../../utils/userDisplay";
+import { RECORD_STATUS_OPTIONS } from "../../utils/recordStatus";
 import "./index.scss";
 
-const statusOptions = [
-  { label: "待处理", value: "pending" },
-  { label: "已确认", value: "confirmed" },
-  { label: "进行中", value: "in_progress" },
-  { label: "已完成", value: "done" },
-  { label: "已取消", value: "cancelled" },
-];
+const statusOptions = RECORD_STATUS_OPTIONS;
 
 function buildDateTime(date: string, time: string) {
   if (!date || !time) return undefined;

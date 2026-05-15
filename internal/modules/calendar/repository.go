@@ -373,7 +373,12 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 		return nil, err
 	}
 
-	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	statusExpr := `CASE
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) IN ('completed', 'done') THEN 'completed'
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) = 'cancelled' THEN 'cancelled'
+		WHEN LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full') THEN LOWER(COALESCE(ce.event_type, 'record'))
+		ELSE 'pending'
+	END`
 	whereParts := []string{
 		"ce.calendar_id = $1",
 		"cm.user_id = $2",
@@ -545,13 +550,17 @@ func (r *Repository) MonthlyStats(ctx context.Context, userID, calendarID int64,
 		return nil, err
 	}
 	stats := MonthlyStats{Month: month}
-	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	statusExpr := `CASE
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) IN ('completed', 'done') THEN 'completed'
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) = 'cancelled' THEN 'cancelled'
+		WHEN LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full') THEN LOWER(COALESCE(ce.event_type, 'record'))
+		ELSE 'pending'
+	END`
 	err := r.db.QueryRow(ctx, fmt.Sprintf(`
 		SELECT
 			COUNT(*) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) NOT IN ('rest','blocked','full')),
 			COUNT(*) FILTER (WHERE %s = 'pending'),
-			COUNT(*) FILTER (WHERE %s = 'confirmed'),
-			COUNT(*) FILTER (WHERE %s IN ('done', 'completed')),
+			COUNT(*) FILTER (WHERE %s = 'completed'),
 			COUNT(*) FILTER (WHERE %s = 'cancelled'),
 			COUNT(DISTINCT ce.start_at::date) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) = 'rest'),
 			COUNT(DISTINCT ce.start_at::date) FILTER (WHERE LOWER(COALESCE(ce.event_type, 'record')) = 'full')
@@ -563,7 +572,7 @@ func (r *Repository) MonthlyStats(ctx context.Context, userID, calendarID int64,
 		  AND ce.start_at >= $3
 		  AND ce.start_at < $4
 		  AND (ce.record_id IS NULL OR (rec.id IS NOT NULL AND rec.deleted_at IS NULL))
-	`, statusExpr, statusExpr, statusExpr, statusExpr), calendarID, userID, startAt, endAt).Scan(&stats.Total, &stats.Pending, &stats.Confirmed, &stats.Done, &stats.Cancelled, &stats.RestDays, &stats.FullDays)
+	`, statusExpr, statusExpr, statusExpr), calendarID, userID, startAt, endAt).Scan(&stats.Total, &stats.Pending, &stats.Completed, &stats.Cancelled, &stats.RestDays, &stats.FullDays)
 	if err != nil {
 		return nil, err
 	}
@@ -574,13 +583,18 @@ func (r *Repository) MemberWorkloadStats(ctx context.Context, userID, calendarID
 	if _, err := r.GetUserRole(ctx, userID, calendarID); err != nil {
 		return nil, err
 	}
-	statusExpr := "LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END)"
+	statusExpr := `CASE
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) IN ('completed', 'done') THEN 'completed'
+		WHEN LOWER(CASE WHEN ce.status = 'active' AND rec.status IS NOT NULL THEN rec.status ELSE COALESCE(ce.status, rec.status, 'pending') END) = 'cancelled' THEN 'cancelled'
+		WHEN LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'blocked', 'full') THEN LOWER(COALESCE(ce.event_type, 'record'))
+		ELSE 'pending'
+	END`
 	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
 			u.id,
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			COUNT(*),
-			COUNT(*) FILTER (WHERE %s IN ('done', 'completed')),
+			COUNT(*) FILTER (WHERE %s = 'completed'),
 			COUNT(*) FILTER (WHERE %s = 'cancelled'),
 			COUNT(*) FILTER (WHERE %s = 'pending')
 		FROM calendar_events ce
@@ -603,7 +617,7 @@ func (r *Repository) MemberWorkloadStats(ctx context.Context, userID, calendarID
 	stats := MemberWorkloadStats{Month: month, Items: []MemberWorkloadItem{}}
 	for rows.Next() {
 		var item MemberWorkloadItem
-		if err := rows.Scan(&item.UserID, &item.Name, &item.Total, &item.Done, &item.Cancelled, &item.Pending); err != nil {
+		if err := rows.Scan(&item.UserID, &item.Name, &item.Total, &item.Completed, &item.Cancelled, &item.Pending); err != nil {
 			return nil, err
 		}
 		stats.Items = append(stats.Items, item)

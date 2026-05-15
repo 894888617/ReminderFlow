@@ -251,9 +251,14 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 	argIndex := 2
 
 	if params.Status != "" {
-		whereParts = append(whereParts, fmt.Sprintf("rec.status = $%d", argIndex))
-		args = append(args, params.Status)
-		argIndex++
+		switch params.Status {
+		case "COMPLETED":
+			whereParts = append(whereParts, "rec.status IN ('COMPLETED', 'DONE')")
+		case "CANCELLED":
+			whereParts = append(whereParts, "rec.status = 'CANCELLED'")
+		default:
+			whereParts = append(whereParts, "rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')")
+		}
 	}
 
 	if params.AssigneeID != nil {
@@ -317,12 +322,10 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 		WHERE %s
 		ORDER BY 
 			CASE 
-				WHEN rec.status = 'OVERDUE' THEN 1
-				WHEN rec.status = 'PENDING' THEN 2
-				WHEN rec.status = 'IN_PROGRESS' THEN 3
-				WHEN rec.status = 'DONE' THEN 4
-				WHEN rec.status = 'CANCELLED' THEN 5
-				ELSE 6
+				WHEN rec.status IN ('PENDING', 'IN_PROGRESS', 'OVERDUE', 'PROCESSING', 'DOING') THEN 1
+				WHEN rec.status IN ('COMPLETED', 'DONE') THEN 2
+				WHEN rec.status = 'CANCELLED' THEN 3
+				ELSE 4
 			END,
 			CASE WHEN rec.due_at IS NULL THEN 1 ELSE 0 END,
 			rec.due_at ASC,
@@ -360,6 +363,7 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 			return nil, err
 		}
 
+		rec.Status = NormalizeRecordStatus(rec.Status)
 		items = append(items, rec)
 	}
 
@@ -380,9 +384,20 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 		TotalPages: totalPages,
 	}, nil
 }
+func NormalizeRecordStatus(status string) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "COMPLETED", "DONE":
+		return "COMPLETED"
+	case "CANCELLED":
+		return "CANCELLED"
+	default:
+		return "PENDING"
+	}
+}
+
 func IsValidStatus(status string) bool {
 	switch status {
-	case "PENDING", "IN_PROGRESS", "DONE", "OVERDUE", "CANCELLED":
+	case "PENDING", "COMPLETED", "CANCELLED":
 		return true
 	default:
 		return false
@@ -559,9 +574,14 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 }
 
 func (r *Repository) UpdateStatus(ctx context.Context, id int64, status string) (*Record, error) {
-	var recordID int64
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
 
-	err := r.db.QueryRow(ctx, `
+	var recordID int64
+	err = tx.QueryRow(ctx, `
 		UPDATE records
 		SET
 			status = $2,
@@ -569,8 +589,21 @@ func (r *Repository) UpdateStatus(ctx context.Context, id int64, status string) 
 		WHERE id = $1
 		RETURNING id
 	`, id, status).Scan(&recordID)
-
 	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE calendar_events
+		SET status = $2
+		WHERE record_id = $1
+		  AND deleted_at IS NULL
+	`, id, strings.ToLower(status))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -598,7 +631,7 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 		WHERE wm.status = 'active'
 		  AND wm.user_id = $1
 		  AND rec.assignee_id = $1
-		  AND rec.status = 'OVERDUE'
+		  AND FALSE
 		ORDER BY rec.due_at ASC, rec.created_at DESC
 		LIMIT 100
 	`, userID)

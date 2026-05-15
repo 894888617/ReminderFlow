@@ -95,8 +95,7 @@ type MonthlyStats struct {
 	Month     string `json:"month"`
 	Total     int64  `json:"total"`
 	Pending   int64  `json:"pending"`
-	Confirmed int64  `json:"confirmed"`
-	Done      int64  `json:"done"`
+	Completed int64  `json:"completed"`
 	Cancelled int64  `json:"cancelled"`
 	RestDays  int64  `json:"rest_days"`
 	FullDays  int64  `json:"full_days"`
@@ -106,7 +105,7 @@ type MemberWorkloadItem struct {
 	UserID    int64  `json:"user_id"`
 	Name      string `json:"name"`
 	Total     int64  `json:"total"`
-	Done      int64  `json:"done"`
+	Completed int64  `json:"completed"`
 	Cancelled int64  `json:"cancelled"`
 	Pending   int64  `json:"pending"`
 }

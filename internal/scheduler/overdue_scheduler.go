@@ -85,7 +85,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 		LEFT JOIN calendars c ON c.id = rec.calendar_id
 		WHERE rec.due_at IS NOT NULL
 		  AND rec.due_at < NOW()
-		  AND rec.status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
+		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		ORDER BY rec.due_at ASC
 		LIMIT 100
 		FOR UPDATE OF rec SKIP LOCKED
@@ -127,11 +127,9 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 	for _, item := range overdueList {
 		_, err := tx.Exec(ctx, `
 			UPDATE records
-			SET
-				status = 'OVERDUE',
-				updated_at = NOW()
+			SET updated_at = NOW()
 			WHERE id = $1
-			  AND status NOT IN ('DONE', 'CANCELLED', 'OVERDUE')
+			  AND status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 		`, item.ID)
 
 		if err != nil {
@@ -172,7 +170,7 @@ func (s *OverdueScheduler) ScanAndMarkOverdue(ctx context.Context) error {
 			log.Printf("warning: skip overdue notification for missing user_id=%d record_id=%d", notifyUserID, item.ID)
 		}
 
-		detail := fmt.Sprintf("系统自动将记录「%s」标记为 OVERDUE", item.Title)
+		detail := fmt.Sprintf("系统检测到记录「%s」已超过截止时间", item.Title)
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO operation_logs (

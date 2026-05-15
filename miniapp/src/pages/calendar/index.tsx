@@ -16,29 +16,26 @@ import {
   type MemberWorkloadItem,
   type MonthlyCalendarStats,
 } from "../../api/calendar";
-import { canCreateRecord } from "../../utils/permission";
+import { updateRecordStatus } from "../../api/record";
+import { canCreateRecord, canUpdateRecordStatus } from "../../utils/permission";
 import { getStoredToken, getStoredUser } from "../../utils/auth";
 import {
   getUserNameDisplay,
   getWechatDisplayName,
 } from "../../utils/userDisplay";
+import {
+  getRecordStatusText,
+  normalizeRecordStatus,
+  RECORD_STATUS_FILTER_OPTIONS,
+  RECORD_STATUS_OPTIONS,
+  type RecordStatus,
+} from "../../utils/recordStatus";
 
 import "./index.scss";
 
 const SELECTED_CALENDAR_KEY = "selected_calendar_id";
 
-const statusOptions = [
-  { label: "全部状态", value: "" },
-  { label: "待处理", value: "pending" },
-  { label: "已确认", value: "confirmed" },
-  { label: "进行中", value: "in_progress" },
-  { label: "已完成", value: "done" },
-  { label: "已取消", value: "cancelled" },
-  { label: "已逾期", value: "overdue" },
-  { label: "休息", value: "rest" },
-  { label: "不接", value: "blocked" },
-  { label: "已满", value: "full" },
-];
+const statusOptions = RECORD_STATUS_FILTER_OPTIONS;
 
 function formatDate(date: Date) {
   const yyyy = date.getFullYear();
@@ -85,31 +82,25 @@ function getMonthDays(date: Date) {
   return result;
 }
 
-function normalizeStatus(status?: string | null) {
-  return String(status || "pending").toLowerCase();
+function normalizeSpecialStatus(status?: string | null) {
+  return String(status || "").toLowerCase();
 }
 
 function getStatusText(status?: string | null, eventType?: string | null) {
-  const normalized = normalizeStatus(eventType || status);
-  const map: Record<string, string> = {
-    pending: "待处理",
-    confirmed: "已确认",
-    in_progress: "进行中",
-    done: "已完成",
-    completed: "已完成",
-    cancelled: "已取消",
-    overdue: "已逾期",
+  const specialStatus = normalizeSpecialStatus(eventType);
+  const specialMap: Record<string, string> = {
     rest: "休息",
     blocked: "不接",
     full: "已满",
   };
-  return map[normalized] || "待处理";
+  if (specialMap[specialStatus]) return specialMap[specialStatus];
+  return getRecordStatusText(status);
 }
 
 function getEventStatus(event: CalendarEvent) {
-  const eventType = normalizeStatus(event.event_type);
+  const eventType = normalizeSpecialStatus(event.event_type);
   if (["rest", "blocked", "full"].includes(eventType)) return eventType;
-  return normalizeStatus(event.status);
+  return normalizeRecordStatus(event.status);
 }
 
 function getEventDate(event: CalendarEvent) {
@@ -184,6 +175,7 @@ export default function CalendarPage() {
   );
   const currentUserRole = normalizeCalendarRole(selectedCalendar);
   const writable = canCreateRecord(currentUserRole);
+  const canChangeRecordStatus = canUpdateRecordStatus(currentUserRole);
 
   const calendarNames = useMemo(
     () => calendars.map((item) => item.name),
@@ -499,6 +491,45 @@ export default function CalendarPage() {
     });
   };
 
+  const refreshCalendarData = async () => {
+    if (!currentCalendarId) return;
+    await Promise.all([
+      loadEvents(currentCalendarId),
+      loadStats(currentCalendarId),
+    ]);
+  };
+
+  const handleChangeRecordStatus = (item: CalendarEvent) => {
+    if (!item.record_id) return;
+
+    if (!canChangeRecordStatus) {
+      Taro.showToast({ title: "无状态修改权限", icon: "none" });
+      return;
+    }
+
+    const currentStatus = normalizeRecordStatus(item.status);
+    Taro.showActionSheet({
+      itemList: RECORD_STATUS_OPTIONS.map((option) => option.label),
+      success: async (res) => {
+        const nextStatus = RECORD_STATUS_OPTIONS[res.tapIndex]?.value as RecordStatus | undefined;
+        if (!nextStatus || nextStatus === currentStatus) return;
+
+        try {
+          Taro.showLoading({ title: "更新中", mask: true });
+          await updateRecordStatus(item.record_id!, nextStatus);
+          await refreshCalendarData();
+          Taro.hideLoading();
+          Taro.showToast({ title: "状态已更新", icon: "success" });
+        } catch (err) {
+          console.error(err);
+          Taro.hideLoading();
+          Taro.showToast({ title: "状态更新失败", icon: "none" });
+          await refreshCalendarData();
+        }
+      },
+    });
+  };
+
   const renderCustomNav = () => (
     <View className="custom-nav">
       <View className="nav-main-row">
@@ -578,7 +609,14 @@ export default function CalendarPage() {
               ) : null}
             </View>
             <View className="timeline-actions">
-              <View className={`record-status status-${getEventStatus(item)}`}>
+              <View
+                className={`record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
+                onClick={(event) => {
+                  if (!item.record_id) return;
+                  event.stopPropagation();
+                  handleChangeRecordStatus(item);
+                }}
+              >
                 {getStatusText(item.status, item.event_type)}
               </View>
               {isSpecialEvent(item) && writable ? (
@@ -606,7 +644,7 @@ export default function CalendarPage() {
         <View className="onboarding-empty">
           <View className="onboarding-title">还没有日历</View>
           <View className="onboarding-desc">
-            创建共享日历后，可以添加预约、设置提醒、邀请成员协作。
+            创建共享日历后，可以添加预约、邀请成员协作。
           </View>
           <View
             className="onboarding-primary-btn"
@@ -730,7 +768,7 @@ export default function CalendarPage() {
         <View className="stats-title">本月接单统计</View>
         <View className="stats-grid">
           <View>预约 {monthlyStats?.total || 0}</View>
-          <View>完成 {monthlyStats?.done || 0}</View>
+          <View>完成 {monthlyStats?.completed || 0}</View>
           <View>取消 {monthlyStats?.cancelled || 0}</View>
           <View>待处理 {monthlyStats?.pending || 0}</View>
           <View>休息 {monthlyStats?.rest_days || 0} 天</View>

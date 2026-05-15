@@ -3,26 +3,13 @@ import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { getTodayTodos, type TodayTodoResult, type TodoRecord, type TodoReminder } from '../../api/todo'
 import { getStoredToken } from '../../utils/auth'
+import { getRecordStatusText } from '../../utils/recordStatus'
 import './index.scss'
 
 type TabKey = 'due_today' | 'reminders_today' | 'unfinished'
 
-function statusText(status: string) {
-  switch (status) {
-    case 'PENDING':
-      return '待处理'
-    case 'IN_PROGRESS':
-      return '进行中'
-    case 'DONE':
-      return '已完成'
-    case 'OVERDUE':
-      return '已逾期'
-    case 'CANCELLED':
-      return '已取消'
-    default:
-      return status || '-'
-  }
-}
+const statusText = getRecordStatusText
+
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
