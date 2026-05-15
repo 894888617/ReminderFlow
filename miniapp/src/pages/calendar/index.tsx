@@ -23,11 +23,6 @@ import { getUserNameDisplay, getWechatDisplayName } from "../../utils/userDispla
 
 import "./index.scss";
 
-definePageConfig({
-  navigationStyle: "custom",
-  enablePullDownRefresh: true,
-});
-
 const SELECTED_CALENDAR_KEY = "selected_calendar_id";
 
 const statusOptions = [
@@ -130,7 +125,7 @@ function getEventTitle(event: CalendarEvent) {
   if (status === "rest") return "休息";
   if (status === "blocked") return "不接";
   if (status === "full") return "已满";
-  return event.title || event.record_title || "未命名日程";
+  return event.title || "未命名日程";
 }
 
 export default function CalendarPage() {
@@ -494,14 +489,6 @@ export default function CalendarPage() {
     return (
       <View className="container calendar-container">
         {renderCustomNav()}
-        <View className="calendar-header">
-          <View>
-            <View className="page-title">日历</View>
-            <View className="page-desc">
-              创建共享日历后，即可管理预约日程。
-            </View>
-          </View>
-        </View>
         <View className="onboarding-empty">
           <View className="onboarding-title">还没有日历</View>
           <View className="onboarding-desc">
