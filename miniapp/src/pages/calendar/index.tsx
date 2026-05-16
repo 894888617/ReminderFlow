@@ -825,24 +825,24 @@ export default function CalendarPage() {
         <View className="compact-stats-title">本月统计</View>
         <View className="compact-stats-row">
           <View className="compact-stat-item">
-            预约 {monthlyStats?.total || 0}
+            预约 {monthlyStats?.total || 0} 条
           </View>
-          <View className="compact-stat-item">
-            完成 {monthlyStats?.completed || 0}
-          </View>
-          <View className="compact-stat-item">
-            取消 {monthlyStats?.cancelled || 0}
-          </View>
-          <View className="compact-stat-item">
-            待处理 {monthlyStats?.pending || 0}
-          </View>
-        </View>
-        <View className="compact-stats-row secondary">
           <View className="compact-stat-item">
             休息 {monthlyStats?.rest_days || 0} 天
           </View>
           <View className="compact-stat-item">
             已满 {monthlyStats?.full_days || 0} 天
+          </View>
+        </View>
+        <View className="compact-stats-row">
+          <View className="compact-stat-item">
+            完成 {monthlyStats?.completed || 0} 单
+          </View>
+          <View className="compact-stat-item">
+            取消 {monthlyStats?.cancelled || 0} 单
+          </View>
+          <View className="compact-stat-item">
+            待处理 {monthlyStats?.pending || 0} 单
           </View>
         </View>
         {workload.length > 0 ? (
@@ -928,14 +928,14 @@ export default function CalendarPage() {
         </View>
       </View>
 
-      <View className="record-section-head">
-        <View>
-          <View className="section-title">当天日程</View>
-          <View className="section-subtitle">
-            {selectedDate} ｜ {selectedDateEvents.length} 条
-          </View>
-        </View>
-      </View>
+      {/*<View className="record-section-head">*/}
+      {/*  <View>*/}
+      {/*    <View className="section-title">当天日程</View>*/}
+      {/*    <View className="section-subtitle">*/}
+      {/*      {selectedDate} ｜ {selectedDateEvents.length} 条*/}
+      {/*    </View>*/}
+      {/*  </View>*/}
+      {/*</View>*/}
 
       {renderScheduleList()}
     </View>

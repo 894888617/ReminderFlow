@@ -138,12 +138,12 @@
 }
 
 .month-card {
-  margin: 18px 24px 24px;
-  padding: 0 0 18px;
+  margin: 12px 0px 12px;
+  padding: 0 0 12px;
   border-radius: 28px;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 4px rgba(15, 23, 42, 0.04);
 }
 
 .record-card,
@@ -159,7 +159,7 @@
 .month-title {
   flex: 1;
   text-align: center;
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 900;
   color: #111827;
   min-width: 0;
@@ -496,8 +496,8 @@
 }
 
 .compact-stats-card {
-  margin: 0 24px 18px;
-  padding: 16px 20px;
+  margin: 0 0px 0px;
+  padding: 12px 16px;
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
@@ -505,14 +505,14 @@
 
 .compact-stats-title {
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 800;
   color: #111827;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .compact-stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 6px;
 }
@@ -525,11 +525,11 @@
 .compact-stat-item {
   min-width: 0;
   border-radius: 12px;
-  padding: 7px 8px;
+  padding: 5px 6px;
   background: #f8fafc;
   color: #374151;
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 700;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;

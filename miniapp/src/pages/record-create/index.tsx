@@ -348,29 +348,29 @@ export default function RecordCreatePage() {
           <Input
             className="form-input"
             value={customerName}
-            placeholder="例如：客户A"
+            // placeholder="例如：客户A"
             maxlength={128}
             onInput={(e) => setCustomerName(e.detail.value)}
           />
         </View>
 
         <View className="form-item">
-          <Text className="form-label">客户手机号（可选）</Text>
+          <Text className="form-label">客户手机号</Text>
           <Input
             className="form-input"
             value={customerPhone}
-            placeholder="例如：138xxxx8888"
+            // placeholder="例如：138xxxx8888"
             maxlength={32}
             onInput={(e) => setCustomerPhone(e.detail.value)}
           />
         </View>
 
         <View className="form-item">
-          <Text className="form-label">服务项目（可选）</Text>
+          <Text className="form-label">服务项目</Text>
           <Input
             className="form-input"
             value={serviceName}
-            placeholder="例如：美甲护理"
+            // placeholder="例如：美甲护理"
             maxlength={128}
             onInput={(e) => setServiceName(e.detail.value)}
           />
@@ -381,7 +381,7 @@ export default function RecordCreatePage() {
           <Input
             className="form-input"
             value={title}
-            placeholder="例如：客户A 美甲护理，可留空自动生成"
+            placeholder="可留空自动生成 客户姓名 + 服务项目"
             maxlength={200}
             onInput={(e) => setTitle(e.detail.value)}
           />
@@ -392,7 +392,7 @@ export default function RecordCreatePage() {
           <Textarea
             className="form-textarea"
             value={content}
-            placeholder="历史偏好、注意事项、补款等备注"
+            // placeholder="历史偏好、注意事项、补款等备注"
             maxlength={1000}
             onInput={(e) => setContent(e.detail.value)}
           />
