@@ -233,6 +233,7 @@ export default function RecordCreatePage() {
     const finalAppointmentDate = appointmentDate || defaultAppointmentDate;
     const finalStartTime = startTime.trim();
     const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
+    const calendarAllDay = !finalStartTime;
 
     try {
       setSubmitting(true);
@@ -256,6 +257,8 @@ export default function RecordCreatePage() {
           .join("\n"),
         assignee_id: assigneeId,
         due_at: calendarStartAt,
+        calendar_start_at: calendarStartAt,
+        calendar_all_day: calendarAllDay,
         appointment_status: statusOptions[statusIndex].value,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),

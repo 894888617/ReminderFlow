@@ -112,11 +112,9 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.AppointmentStatus = "pending"
 	}
 
-	if shouldCheckScheduleConflict(params.CalendarID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AppointmentStatus) {
-		if err := r.checkScheduleConflict(ctx, params.CalendarID, 0, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
-			return nil, err
-		}
-	}
+	// Appointment times are advisory when creating records. Do not block creation on
+	// schedule-overlap validation; users can resolve conflicts after the record is visible
+	// on the calendar.
 
 	var rec Record
 	err = tx.QueryRow(ctx, `
@@ -639,11 +637,9 @@ type UpdateRecordParams struct {
 }
 
 func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Record, error) {
-	if params.UpdateCalendarAt && shouldCheckScheduleConflict(params.CalendarID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.Status) {
-		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.ID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
-			return nil, err
-		}
-	}
+	// Appointment times are advisory when updating records. Do not block updates on
+	// schedule-overlap validation; users can resolve conflicts after the record is visible
+	// on the calendar.
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

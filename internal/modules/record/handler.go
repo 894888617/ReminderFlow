@@ -108,38 +108,24 @@ func (h *Handler) Create(c *gin.Context) {
 		}
 	}
 
-	dueAt, ok := parseOptionalRFC3339(c, req.DueAt, "due_at")
-	if !ok {
-		return
-	}
+	dueAt := parseOptionalRFC3339Lenient(req.DueAt)
 
 	remindAt, ok := parseOptionalRFC3339(c, req.RemindAt, "remind_at")
 	if !ok {
 		return
 	}
 
-	var calendarStartAt *time.Time
-	if strings.TrimSpace(req.CalendarStartAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, req.CalendarStartAt)
-		if err != nil {
-			response.BadRequest(c, "invalid calendar_start_at format, use RFC3339")
-			return
-		}
-		calendarStartAt = &parsed
+	calendarStartAt := parseOptionalRFC3339Lenient(req.CalendarStartAt)
+	if calendarStartAt == nil {
+		calendarStartAt = dueAt
 	}
 
 	var calendarEndAt *time.Time
-	if req.CalendarEndAt != nil && strings.TrimSpace(*req.CalendarEndAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.CalendarEndAt))
-		if err != nil {
-			response.BadRequest(c, "invalid calendar_end_at format, use RFC3339")
-			return
-		}
-		if calendarStartAt != nil && parsed.Before(*calendarStartAt) {
-			response.BadRequest(c, "calendar_end_at must not be before calendar_start_at")
-			return
-		}
-		calendarEndAt = &parsed
+	if req.CalendarEndAt != nil {
+		calendarEndAt = parseOptionalRFC3339Lenient(*req.CalendarEndAt)
+	}
+	if calendarStartAt != nil && calendarEndAt != nil && calendarEndAt.Before(*calendarStartAt) {
+		calendarEndAt = nil
 	}
 
 	calendarAllDay := true
@@ -356,6 +342,20 @@ func parseOptionalRFC3339(c *gin.Context, value string, field string) (*time.Tim
 	return &parsed, true
 }
 
+func parseOptionalRFC3339Lenient(value string) *time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil
+	}
+
+	return &parsed
+}
+
 func parseRecordID(c *gin.Context) (int64, bool) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
@@ -461,34 +461,21 @@ func (h *Handler) Update(c *gin.Context) {
 		}
 	}
 
-	dueAt, ok := parseOptionalRFC3339(c, req.DueAt, "due_at")
-	if !ok {
-		return
-	}
+	dueAt := parseOptionalRFC3339Lenient(req.DueAt)
 
-	var calendarStartAt *time.Time
+	calendarStartAt := parseOptionalRFC3339Lenient(req.CalendarStartAt)
 	updateCalendarAt := req.CalendarAllDay != nil || strings.TrimSpace(req.CalendarStartAt) != "" || req.CalendarEndAt != nil
-	if strings.TrimSpace(req.CalendarStartAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(req.CalendarStartAt))
-		if err != nil {
-			response.BadRequest(c, "invalid calendar_start_at format, use RFC3339")
-			return
-		}
-		calendarStartAt = &parsed
+	if calendarStartAt == nil && dueAt != nil {
+		calendarStartAt = dueAt
+		updateCalendarAt = true
 	}
 
 	var calendarEndAt *time.Time
-	if req.CalendarEndAt != nil && strings.TrimSpace(*req.CalendarEndAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.CalendarEndAt))
-		if err != nil {
-			response.BadRequest(c, "invalid calendar_end_at format, use RFC3339")
-			return
-		}
-		if calendarStartAt != nil && parsed.Before(*calendarStartAt) {
-			response.BadRequest(c, "calendar_end_at must not be before calendar_start_at")
-			return
-		}
-		calendarEndAt = &parsed
+	if req.CalendarEndAt != nil {
+		calendarEndAt = parseOptionalRFC3339Lenient(*req.CalendarEndAt)
+	}
+	if calendarStartAt != nil && calendarEndAt != nil && calendarEndAt.Before(*calendarStartAt) {
+		calendarEndAt = nil
 	}
 
 	calendarAllDay := false
