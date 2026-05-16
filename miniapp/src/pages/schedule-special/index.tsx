@@ -9,6 +9,10 @@ import {
   type SpecialDayType,
 } from "../../api/calendar";
 import { getUserNameDisplay } from "../../utils/userDisplay";
+import {
+  returnToCalendar,
+  saveCalendarReturnContext,
+} from "../../utils/calendarReturn";
 
 import "./index.scss";
 
@@ -26,6 +30,7 @@ export default function ScheduleSpecialPage() {
   const router = useRouter();
   const calendarId = Number(router.params.calendar_id || 0);
   const selectedDate = String(router.params.selected_date || "");
+  const currentDate = String(router.params.current_date || selectedDate || "");
   const rawType = String(router.params.type || "rest");
   const type: SpecialDayType = isSpecialDayType(rawType) ? rawType : "rest";
 
@@ -108,19 +113,19 @@ export default function ScheduleSpecialPage() {
         remark: remark.trim() || undefined,
       });
 
-      Taro.setStorageSync("calendar_return_context", {
+      saveCalendarReturnContext({
+        currentCalendarId: calendarId,
+        current_calendar_id: calendarId,
         calendar_id: calendarId,
+        current_date: currentDate || selectedDate,
         selected_date: selectedDate,
-        refresh_at: Date.now(),
       });
 
       Taro.hideLoading();
       Taro.showToast({ title: "设置成功", icon: "success" });
 
       setTimeout(() => {
-        Taro.redirectTo({
-          url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${selectedDate}`,
-        });
+        returnToCalendar();
       }, 500);
     } catch (err) {
       console.error(err);

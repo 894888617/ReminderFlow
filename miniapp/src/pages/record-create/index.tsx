@@ -15,6 +15,10 @@ import { canCreateRecord } from "../../utils/permission";
 import { getStoredToken, getStoredUser } from "../../utils/auth";
 import { getUserNameDisplay } from "../../utils/userDisplay";
 import { RECORD_STATUS_OPTIONS } from "../../utils/recordStatus";
+import {
+  returnToCalendar,
+  saveCalendarReturnContext,
+} from "../../utils/calendarReturn";
 import "./index.scss";
 
 const statusOptions = RECORD_STATUS_OPTIONS;
@@ -46,6 +50,7 @@ export default function RecordCreatePage() {
     router.params.calendar_id || router.params.workspace_id || 0,
   );
   const selectedDate = String(router.params.selected_date || "");
+  const currentDate = String(router.params.current_date || selectedDate || "");
   const currentUser = getStoredUser();
   const defaultAppointmentDate = selectedDate || todayDate();
 
@@ -243,7 +248,7 @@ export default function RecordCreatePage() {
         mask: true,
       });
 
-      const record = await createRecord({
+      await createRecord({
         workspace_id: calendarId,
         calendar_id: calendarId,
         title: finalTitle,
@@ -272,22 +277,16 @@ export default function RecordCreatePage() {
         icon: "success",
       });
 
-      setTimeout(() => {
-        if (selectedDate) {
-          Taro.setStorageSync("calendar_return_context", {
-            calendar_id: calendarId,
-            selected_date: finalAppointmentDate,
-            refresh_at: Date.now(),
-          });
-          Taro.redirectTo({
-            url: `/pages/calendar/index?calendar_id=${calendarId}&selected_date=${finalAppointmentDate}`,
-          });
-          return;
-        }
+      saveCalendarReturnContext({
+        currentCalendarId: calendarId,
+        current_calendar_id: calendarId,
+        calendar_id: calendarId,
+        current_date: currentDate || finalAppointmentDate,
+        selected_date: finalAppointmentDate,
+      });
 
-        Taro.redirectTo({
-          url: `/pages/record-detail/index?id=${record.id}`,
-        });
+      setTimeout(() => {
+        returnToCalendar();
       }, 500);
     } catch (err: any) {
       console.error(err);

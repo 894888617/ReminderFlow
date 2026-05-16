@@ -21,6 +21,10 @@ import { updateRecordStatus } from "../../api/record";
 import { canCreateRecord, canUpdateRecordStatus } from "../../utils/permission";
 import { getStoredToken, getStoredUser } from "../../utils/auth";
 import {
+  CALENDAR_RETURN_CONTEXT_KEY,
+  type CalendarReturnContext,
+} from "../../utils/calendarReturn";
+import {
   getUserNameDisplay,
   getWechatDisplayName,
 } from "../../utils/userDisplay";
@@ -387,25 +391,26 @@ export default function CalendarPage() {
   });
 
   useDidShow(() => {
-    const returnContext = Taro.getStorageSync("calendar_return_context") as {
-      calendar_id?: number;
-      selected_date?: string;
-      refresh_at?: number;
-    } | null;
-    if (returnContext) Taro.removeStorageSync("calendar_return_context");
+    const returnContext = Taro.getStorageSync(
+      CALENDAR_RETURN_CONTEXT_KEY,
+    ) as CalendarReturnContext | null;
+    if (returnContext) Taro.removeStorageSync(CALENDAR_RETURN_CONTEXT_KEY);
 
     const nextSelectedDate = returnContext?.selected_date || routeSelectedDate;
     const nextCalendarId = Number(
-      returnContext?.calendar_id || routeCalendarId || currentCalendarId,
+      returnContext?.currentCalendarId ||
+        returnContext?.current_calendar_id ||
+        returnContext?.calendar_id ||
+        routeCalendarId ||
+        currentCalendarId,
     );
+    const nextDateText = returnContext?.current_date || nextSelectedDate;
+    const nextDate = nextDateText ? parseDate(nextDateText) : currentDate;
 
-    const nextDate = nextSelectedDate
-      ? parseDate(nextSelectedDate)
-      : currentDate;
-    if (nextSelectedDate) {
-      setSelectedDate(nextSelectedDate);
-      setCurrentDate(nextDate);
-    }
+    if (nextSelectedDate) setSelectedDate(nextSelectedDate);
+    if (nextDateText) setCurrentDate(nextDate);
+    if (nextCalendarId) setCurrentCalendarId(nextCalendarId);
+
     loadData(nextCalendarId, nextDate);
   });
 
@@ -504,7 +509,7 @@ export default function CalendarPage() {
       return;
     }
     Taro.navigateTo({
-      url: `/pages/record-create/index?calendar_id=${currentCalendarId}&selected_date=${date}`,
+      url: `/pages/record-create/index?calendar_id=${currentCalendarId}&selected_date=${date}&current_date=${formatDate(currentDate)}`,
     });
   };
 
@@ -544,7 +549,7 @@ export default function CalendarPage() {
 
     const assigneeQuery = `&assignee_id=${selectedAssignee}`;
     Taro.navigateTo({
-      url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&type=${type}${assigneeQuery}`,
+      url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&current_date=${formatDate(currentDate)}&type=${type}${assigneeQuery}`,
     });
   };
 
