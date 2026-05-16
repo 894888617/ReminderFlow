@@ -35,7 +35,14 @@ import "./index.scss";
 
 const SELECTED_CALENDAR_KEY = "selected_calendar_id";
 
-const statusOptions = RECORD_STATUS_FILTER_OPTIONS;
+const statusOptions = [
+  ...RECORD_STATUS_FILTER_OPTIONS,
+  { label: "休息", value: "rest" },
+  { label: "不接", value: "blocked" },
+  { label: "已满", value: "full" },
+];
+
+const specialStatusValues = ["rest", "blocked", "full"];
 
 function formatDate(date: Date) {
   const yyyy = date.getFullYear();
@@ -188,7 +195,7 @@ export default function CalendarPage() {
   const memberFilterOptions = useMemo(() => {
     const options = [{ label: "全部负责人", value: "" }];
     if (currentUser?.id)
-      options.push({ label: "我", value: String(currentUser.id) });
+      options.push({ label: "只看我", value: String(currentUser.id) });
     members.forEach((item) => {
       if (!options.some((option) => option.value === String(item.user_id))) {
         options.push({
@@ -200,14 +207,7 @@ export default function CalendarPage() {
     return options;
   }, [members, currentUser?.id]);
 
-  const assigneeFilterIndex = Math.max(
-    0,
-    memberFilterOptions.findIndex((item) => item.value === assigneeFilter),
-  );
-  const statusFilterIndex = Math.max(
-    0,
-    statusOptions.findIndex((item) => item.value === statusFilter),
-  );
+  const hasActiveFilter = Boolean(assigneeFilter || statusFilter);
 
   const eventsByDate = useMemo(() => {
     return events.reduce<Record<string, CalendarEvent[]>>((map, item) => {
@@ -259,15 +259,20 @@ export default function CalendarPage() {
       return;
     }
     const range = getMonthRange(baseDate);
+    const isSpecialStatus = specialStatusValues.includes(statusFilter);
     const data = await listCalendarEvents(calendarId, {
       ...range,
       assignee_id: assigneeFilter ? Number(assigneeFilter) : undefined,
-      status: statusFilter || undefined,
+      status: !isSpecialStatus && statusFilter ? statusFilter : undefined,
+      event_type: isSpecialStatus ? statusFilter : undefined,
     });
     setEvents(data.items || []);
   };
 
-  const loadData = async (preferredId = currentCalendarId, baseDate = currentDate) => {
+  const loadData = async (
+    preferredId = currentCalendarId,
+    baseDate = currentDate,
+  ) => {
     if (!getStoredToken()) {
       Taro.redirectTo({ url: "/pages/login/index" });
       return;
@@ -362,12 +367,61 @@ export default function CalendarPage() {
   ) => {
     if (!currentCalendarId) return;
     const range = getMonthRange(currentDate);
+    const isSpecialStatus = specialStatusValues.includes(nextStatus);
     const data = await listCalendarEvents(currentCalendarId, {
       ...range,
       assignee_id: nextAssignee ? Number(nextAssignee) : undefined,
-      status: nextStatus || undefined,
+      status: !isSpecialStatus && nextStatus ? nextStatus : undefined,
+      event_type: isSpecialStatus ? nextStatus : undefined,
     });
     setEvents(data.items || []);
+  };
+
+  const openAssigneeFilter = () => {
+    Taro.showActionSheet({
+      itemList: memberFilterOptions.map((item) => item.label),
+      success: (res) => {
+        const value = memberFilterOptions[res.tapIndex]?.value || "";
+        setAssigneeFilter(value);
+        refreshFilteredEvents(value, statusFilter);
+      },
+    });
+  };
+
+  const openStatusFilter = () => {
+    Taro.showActionSheet({
+      itemList: statusOptions.map((item) => item.label),
+      success: (res) => {
+        const value = statusOptions[res.tapIndex]?.value || "";
+        setStatusFilter(value);
+        refreshFilteredEvents(assigneeFilter, value);
+      },
+    });
+  };
+
+  const resetFilter = () => {
+    setAssigneeFilter("");
+    setStatusFilter("");
+    refreshFilteredEvents("", "");
+  };
+
+  const handleOpenFilter = () => {
+    Taro.showActionSheet({
+      itemList: ["筛选负责人", "筛选状态", "重置筛选"],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          openAssigneeFilter();
+          return;
+        }
+
+        if (res.tapIndex === 1) {
+          openStatusFilter();
+          return;
+        }
+
+        resetFilter();
+      },
+    });
   };
 
   const goCreateRecord = (date = selectedDate) => {
@@ -513,7 +567,9 @@ export default function CalendarPage() {
     Taro.showActionSheet({
       itemList: RECORD_STATUS_OPTIONS.map((option) => option.label),
       success: async (res) => {
-        const nextStatus = RECORD_STATUS_OPTIONS[res.tapIndex]?.value as RecordStatus | undefined;
+        const nextStatus = RECORD_STATUS_OPTIONS[res.tapIndex]?.value as
+          | RecordStatus
+          | undefined;
         if (!nextStatus || nextStatus === currentStatus) return;
 
         try {
@@ -547,7 +603,7 @@ export default function CalendarPage() {
         >
           <View className="nav-calendar-pill">
             <Text className="nav-calendar-name">
-              {selectedCalendar?.name || '选择日历'}
+              {selectedCalendar?.name || "选择日历"}
             </Text>
           </View>
         </Picker>
@@ -669,62 +725,70 @@ export default function CalendarPage() {
   return (
     <View className="container calendar-container">
       {renderCustomNav()}
-      <View className="filter-card">
-        <Picker
-          mode="selector"
-          range={memberFilterOptions.map((item) => item.label)}
-          value={assigneeFilterIndex}
-          onChange={(e) => {
-            const value =
-              memberFilterOptions[Number(e.detail.value)]?.value || "";
-            setAssigneeFilter(value);
-            refreshFilteredEvents(value, statusFilter);
-          }}
-        >
-          <View className="filter-picker">
-            负责人：
-            {memberFilterOptions[assigneeFilterIndex]?.label || "全部负责人"}
+      <View className="compact-stats-card">
+        <View className="compact-stats-title">本月统计</View>
+        <View className="compact-stats-row">
+          <View className="compact-stat-item">
+            预约 {monthlyStats?.total || 0}
           </View>
-        </Picker>
-        <Picker
-          mode="selector"
-          range={statusOptions.map((item) => item.label)}
-          value={statusFilterIndex}
-          onChange={(e) => {
-            const value = statusOptions[Number(e.detail.value)]?.value || "";
-            setStatusFilter(value);
-            refreshFilteredEvents(assigneeFilter, value);
-          }}
-        >
-          <View className="filter-picker">
-            状态：{statusOptions[statusFilterIndex]?.label || "全部状态"}
+          <View className="compact-stat-item">
+            完成 {monthlyStats?.completed || 0}
           </View>
-        </Picker>
+          <View className="compact-stat-item">
+            取消 {monthlyStats?.cancelled || 0}
+          </View>
+          <View className="compact-stat-item">
+            待处理 {monthlyStats?.pending || 0}
+          </View>
+        </View>
+        <View className="compact-stats-row secondary">
+          <View className="compact-stat-item">
+            休息 {monthlyStats?.rest_days || 0} 天
+          </View>
+          <View className="compact-stat-item">
+            已满 {monthlyStats?.full_days || 0} 天
+          </View>
+        </View>
+        {workload.length > 0 ? (
+          <View className="compact-member-row">
+            {workload.slice(0, 3).map((item) => (
+              <View key={item.user_id} className="compact-member-chip">
+                {item.name || "成员"} {item.total} 单
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View className="month-card">
         <View className="month-head">
-          <View className="month-btn" onClick={() => changeMonth(-1)}>
+          <View className="month-nav-btn" onClick={() => changeMonth(-1)}>
             {"<"}
           </View>
           <View className="month-title">{formatMonth(currentDate)}</View>
-          <View className="month-btn" onClick={() => changeMonth(1)}>
+          <View className="month-nav-btn" onClick={() => changeMonth(1)}>
             {">"}
           </View>
-          <View
-            className="month-btn today-btn"
-            onClick={() => {
-              setCurrentDate(today);
-              setSelectedDate(todayText);
-              loadEvents(currentCalendarId, today);
-              loadStats(currentCalendarId, today);
-            }}
-          >
-            今天
+          <View className="month-head-actions">
+            <View
+              className="today-btn"
+              onClick={() => {
+                setCurrentDate(today);
+                setSelectedDate(todayText);
+                loadEvents(currentCalendarId, today);
+                loadStats(currentCalendarId, today);
+              }}
+            >
+              今天
+            </View>
+            <View
+              className={hasActiveFilter ? "filter-btn active" : "filter-btn"}
+              onClick={handleOpenFilter}
+            >
+              {hasActiveFilter ? "已筛选" : "筛选"}
+            </View>
           </View>
         </View>
-
-        <View className="calendar-hint">长按日期可新建日程 / 设置状态</View>
 
         <View className="weekday-row">
           {["日", "一", "二", "三", "四", "五", "六"].map((day) => (
@@ -737,7 +801,7 @@ export default function CalendarPage() {
         <View className="day-grid appointment-grid">
           {getMonthDays(currentDate).map((item) => {
             const dayEvents = item.date ? eventsByDate[item.date] || [] : [];
-            const visibleEvents = dayEvents.slice(0, 3);
+            const visibleEvents = dayEvents.slice(0, 8);
             return (
               <View
                 key={item.key}
@@ -759,34 +823,12 @@ export default function CalendarPage() {
                     {getEventTitle(event)}
                   </View>
                 ))}
-                {dayEvents.length > 3 ? (
-                  <View className="event-more">+{dayEvents.length - 3}</View>
+                {dayEvents.length > 8 ? (
+                  <View className="event-more">+{dayEvents.length - 8}</View>
                 ) : null}
               </View>
             );
           })}
-        </View>
-      </View>
-
-      <View className="stats-card">
-        <View className="stats-title">本月接单统计</View>
-        <View className="stats-grid">
-          <View>预约 {monthlyStats?.total || 0}</View>
-          <View>完成 {monthlyStats?.completed || 0}</View>
-          <View>取消 {monthlyStats?.cancelled || 0}</View>
-          <View>待处理 {monthlyStats?.pending || 0}</View>
-          <View>休息 {monthlyStats?.rest_days || 0} 天</View>
-          <View>已满 {monthlyStats?.full_days || 0} 天</View>
-        </View>
-        <View className="workload-row">
-          {(workload.length ? workload : []).map((item) => (
-            <View key={item.user_id} className="workload-chip">
-              {item.name || "成员"} {item.total} 单
-            </View>
-          ))}
-          {workload.length === 0 ? (
-            <View className="stats-empty">暂无成员工作量</View>
-          ) : null}
         </View>
       </View>
 
