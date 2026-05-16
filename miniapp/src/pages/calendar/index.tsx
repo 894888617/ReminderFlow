@@ -44,6 +44,68 @@ const statusOptions = [
 
 const specialStatusValues = ["rest", "blocked", "full"];
 
+const ACTION_SHEET_MAX_ITEMS = 6;
+const ACTION_SHEET_PAGE_SIZE = 4;
+
+type FilterActionSheetOption = {
+  label: string;
+  value: string;
+};
+
+function showPagedActionSheet(
+  options: FilterActionSheetOption[],
+  onSelect: (option: FilterActionSheetOption) => void,
+  page = 0,
+) {
+  if (options.length === 0) return;
+
+  if (options.length <= ACTION_SHEET_MAX_ITEMS) {
+    Taro.showActionSheet({
+      itemList: options.map((item) => item.label),
+      success: (res) => {
+        const option = options[res.tapIndex];
+        if (option) onSelect(option);
+      },
+    });
+    return;
+  }
+
+  const totalPages = Math.ceil(options.length / ACTION_SHEET_PAGE_SIZE);
+  const currentPage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageOptions = options.slice(
+    currentPage * ACTION_SHEET_PAGE_SIZE,
+    (currentPage + 1) * ACTION_SHEET_PAGE_SIZE,
+  );
+  const hasPrevious = currentPage > 0;
+  const hasNext = currentPage < totalPages - 1;
+  const itemList = [
+    ...pageOptions.map((item) => item.label),
+    ...(hasPrevious ? ["上一页"] : []),
+    ...(hasNext ? ["更多选项"] : []),
+  ];
+
+  Taro.showActionSheet({
+    itemList,
+    success: (res) => {
+      const selectedOption = pageOptions[res.tapIndex];
+      if (selectedOption) {
+        onSelect(selectedOption);
+        return;
+      }
+
+      const previousIndex = pageOptions.length;
+      const nextIndex = pageOptions.length + (hasPrevious ? 1 : 0);
+      if (hasPrevious && res.tapIndex === previousIndex) {
+        showPagedActionSheet(options, onSelect, currentPage - 1);
+        return;
+      }
+      if (hasNext && res.tapIndex === nextIndex) {
+        showPagedActionSheet(options, onSelect, currentPage + 1);
+      }
+    },
+  });
+}
+
 function formatDate(date: Date) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -378,24 +440,16 @@ export default function CalendarPage() {
   };
 
   const openAssigneeFilter = () => {
-    Taro.showActionSheet({
-      itemList: memberFilterOptions.map((item) => item.label),
-      success: (res) => {
-        const value = memberFilterOptions[res.tapIndex]?.value || "";
-        setAssigneeFilter(value);
-        refreshFilteredEvents(value, statusFilter);
-      },
+    showPagedActionSheet(memberFilterOptions, (option) => {
+      setAssigneeFilter(option.value);
+      refreshFilteredEvents(option.value, statusFilter);
     });
   };
 
   const openStatusFilter = () => {
-    Taro.showActionSheet({
-      itemList: statusOptions.map((item) => item.label),
-      success: (res) => {
-        const value = statusOptions[res.tapIndex]?.value || "";
-        setStatusFilter(value);
-        refreshFilteredEvents(assigneeFilter, value);
-      },
+    showPagedActionSheet(statusOptions, (option) => {
+      setStatusFilter(option.value);
+      refreshFilteredEvents(assigneeFilter, option.value);
     });
   };
 
