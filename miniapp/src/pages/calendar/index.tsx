@@ -66,6 +66,13 @@ function showPagedActionSheet(
         const option = options[res.tapIndex];
         if (option) onSelect(option);
       },
+      fail: (err) => {
+        if (String(err.errMsg || '').includes('cancel')) {
+          return
+        }
+
+        console.error('show calendar actions failed:', err)
+      },
     });
     return;
   }
@@ -102,6 +109,13 @@ function showPagedActionSheet(
       if (hasNext && res.tapIndex === nextIndex) {
         showPagedActionSheet(options, onSelect, currentPage + 1);
       }
+    },
+    fail: (err) => {
+      if (String(err.errMsg || '').includes('cancel')) {
+        return
+      }
+
+      console.error('show calendar actions failed:', err)
     },
   });
 }
@@ -475,6 +489,13 @@ export default function CalendarPage() {
 
         resetFilter();
       },
+      fail: (err) => {
+        if (String(err.errMsg || '').includes('cancel')) {
+          return
+        }
+
+        console.error('show calendar actions failed:', err)
+      },
     });
   };
 
@@ -538,6 +559,13 @@ export default function CalendarPage() {
           });
         }
       },
+      fail: (err) => {
+        if (String(err.errMsg || '').includes('cancel')) {
+          return
+        }
+
+        console.error('show calendar actions failed:', err)
+      },
     });
   };
 
@@ -568,6 +596,13 @@ export default function CalendarPage() {
         const typeMap = ["rest", "blocked", "full"] as const;
         const type = typeMap[res.tapIndex - 1];
         if (type) goSetSpecialDay(date, type);
+      },
+      fail: (err) => {
+        if (String(err.errMsg || '').includes('cancel')) {
+          return
+        }
+
+        console.error('show calendar actions failed:', err)
       },
     });
   };
@@ -638,6 +673,13 @@ export default function CalendarPage() {
           Taro.showToast({ title: "状态更新失败", icon: "none" });
           await refreshCalendarData();
         }
+      },
+      fail: (err) => {
+        if (String(err.errMsg || '').includes('cancel')) {
+          return
+        }
+
+        console.error('show calendar actions failed:', err)
       },
     });
   };
