@@ -275,19 +275,27 @@ func (h *Handler) List(c *gin.Context) {
 		response.BadRequest(c, "keyword too long")
 		return
 	}
+	customerPhone := strings.TrimSpace(c.Query("customer_phone"))
+	customerName := strings.TrimSpace(c.Query("customer_name"))
+	if len(customerPhone) > 32 || len(customerName) > 128 {
+		response.BadRequest(c, "customer query too long")
+		return
+	}
 
 	startDate := strings.TrimSpace(c.Query("start_date"))
 	endDate := strings.TrimSpace(c.Query("end_date"))
 
 	result, err := h.repo.ListByCalendar(c.Request.Context(), ListRecordsParams{
-		CalendarID: calendarID,
-		Page:       page,
-		PageSize:   pageSize,
-		Status:     status,
-		AssigneeID: assigneeID,
-		Keyword:    keyword,
-		StartDate:  startDate,
-		EndDate:    endDate,
+		CalendarID:    calendarID,
+		Page:          page,
+		PageSize:      pageSize,
+		Status:        status,
+		AssigneeID:    assigneeID,
+		Keyword:       keyword,
+		CustomerName:  customerName,
+		CustomerPhone: customerPhone,
+		StartDate:     startDate,
+		EndDate:       endDate,
 	})
 
 	if err != nil {
@@ -299,10 +307,16 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 type UpdateRecordRequest struct {
-	Title      string `json:"title"`
-	Content    string `json:"content"`
-	AssigneeID *int64 `json:"assignee_id"`
-	DueAt      string `json:"due_at"`
+	Title           string  `json:"title"`
+	Content         string  `json:"content"`
+	AssigneeID      *int64  `json:"assignee_id"`
+	DueAt           string  `json:"due_at"`
+	CalendarStartAt string  `json:"calendar_start_at"`
+	CalendarEndAt   *string `json:"calendar_end_at"`
+	CalendarAllDay  *bool   `json:"calendar_all_day"`
+	CustomerName    string  `json:"customer_name"`
+	CustomerPhone   string  `json:"customer_phone"`
+	ServiceName     string  `json:"service_name"`
 }
 
 type UpdateStatusRequest struct {
@@ -415,6 +429,14 @@ func (h *Handler) Update(c *gin.Context) {
 
 	req.Title = strings.TrimSpace(req.Title)
 	req.Content = strings.TrimSpace(req.Content)
+	req.CustomerName = strings.TrimSpace(req.CustomerName)
+	req.CustomerPhone = strings.TrimSpace(req.CustomerPhone)
+	req.ServiceName = strings.TrimSpace(req.ServiceName)
+	if req.CustomerName == "" && req.CustomerPhone == "" && req.ServiceName == "" {
+		req.CustomerName = oldRec.CustomerName
+		req.CustomerPhone = oldRec.CustomerPhone
+		req.ServiceName = oldRec.ServiceName
+	}
 
 	if req.Title == "" {
 		response.BadRequest(c, "title required")
@@ -444,12 +466,51 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
+	var calendarStartAt *time.Time
+	updateCalendarAt := req.CalendarAllDay != nil || strings.TrimSpace(req.CalendarStartAt) != "" || req.CalendarEndAt != nil
+	if strings.TrimSpace(req.CalendarStartAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(req.CalendarStartAt))
+		if err != nil {
+			response.BadRequest(c, "invalid calendar_start_at format, use RFC3339")
+			return
+		}
+		calendarStartAt = &parsed
+	}
+
+	var calendarEndAt *time.Time
+	if req.CalendarEndAt != nil && strings.TrimSpace(*req.CalendarEndAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.CalendarEndAt))
+		if err != nil {
+			response.BadRequest(c, "invalid calendar_end_at format, use RFC3339")
+			return
+		}
+		if calendarStartAt != nil && parsed.Before(*calendarStartAt) {
+			response.BadRequest(c, "calendar_end_at must not be before calendar_start_at")
+			return
+		}
+		calendarEndAt = &parsed
+	}
+
+	calendarAllDay := false
+	if req.CalendarAllDay != nil {
+		calendarAllDay = *req.CalendarAllDay
+	}
+
 	rec, err := h.repo.Update(c.Request.Context(), UpdateRecordParams{
-		ID:         recordID,
-		Title:      req.Title,
-		Content:    req.Content,
-		AssigneeID: req.AssigneeID,
-		DueAt:      dueAt,
+		ID:               recordID,
+		CalendarID:       oldRec.CalendarID,
+		UpdatedBy:        currentUserID,
+		Title:            req.Title,
+		Content:          req.Content,
+		AssigneeID:       req.AssigneeID,
+		DueAt:            dueAt,
+		CalendarStartAt:  calendarStartAt,
+		CalendarEndAt:    calendarEndAt,
+		CalendarAllDay:   calendarAllDay,
+		UpdateCalendarAt: updateCalendarAt,
+		CustomerName:     req.CustomerName,
+		CustomerPhone:    req.CustomerPhone,
+		ServiceName:      req.ServiceName,
 	})
 
 	if err != nil {

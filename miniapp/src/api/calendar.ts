@@ -59,7 +59,13 @@ export interface CalendarEvent {
   calendar_id: number;
   record_id?: number | null;
   title: string;
+  record_title?: string;
+  record_content?: string;
   content?: string;
+  remark?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  service_name?: string;
   start_at: string;
   end_at?: string | null;
   all_day?: boolean;
@@ -243,7 +249,7 @@ export type SpecialDayType = "rest" | "blocked" | "full";
 export interface CreateSpecialCalendarEventParams {
   date: string;
   type: SpecialDayType;
-  assignee_id: number;
+  assignee_id?: number;
   start_time?: string;
   end_time?: string;
   all_day?: boolean;

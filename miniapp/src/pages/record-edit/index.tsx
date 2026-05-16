@@ -78,8 +78,9 @@ export default function RecordEditPage() {
   const [assigneeId, setAssigneeId] = useState<number | undefined>()
   const [status, setStatus] = useState<RecordStatus>('PENDING')
 
-  const [dueDate, setDueDate] = useState('')
-  const [dueTime, setDueTime] = useState('')
+  const [appointmentDate, setAppointmentDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -138,9 +139,11 @@ export default function RecordEditPage() {
       setAssigneeId(detail.assignee_id || undefined)
       setStatus(normalizeRecordStatus(detail.status))
 
-      const due = splitDateTime(detail.due_at)
-      setDueDate(due.date)
-      setDueTime(due.time)
+      const start = splitDateTime(detail.calendar_start_at || detail.due_at)
+      const end = splitDateTime(detail.calendar_end_at)
+      setAppointmentDate(start.date)
+      setStartTime(start.time)
+      setEndTime(end.time)
 
       const memberList = await listCalendarMembers(detail.workspace_id)
       setMembers(memberList || [])
@@ -183,15 +186,33 @@ export default function RecordEditPage() {
       return
     }
 
-    if ((dueDate && !dueTime) || (!dueDate && dueTime)) {
+    if ((appointmentDate && !startTime) || (!appointmentDate && startTime)) {
       Taro.showToast({
-        title: '请完整选择截止日期和时间',
+        title: '请完整选择预约日期和开始时间',
         icon: 'none',
       })
       return
     }
 
-    const dueAt = buildDateTime(dueDate, dueTime)
+    if (endTime && !startTime) {
+      Taro.showToast({
+        title: '请先选择开始时间',
+        icon: 'none',
+      })
+      return
+    }
+
+    if (startTime && endTime && endTime <= startTime) {
+      Taro.showToast({
+        title: '结束时间需晚于开始时间',
+        icon: 'none',
+      })
+      return
+    }
+
+    const calendarStartAt = buildDateTime(appointmentDate, startTime)
+    const calendarEndAt = endTime ? buildDateTime(appointmentDate, endTime) : undefined
+    const dueAt = calendarEndAt || calendarStartAt
 
     try {
       setSubmitting(true)
@@ -206,6 +227,9 @@ export default function RecordEditPage() {
         content: content.trim(),
         assignee_id: assigneeId,
         due_at: dueAt,
+        calendar_start_at: calendarStartAt,
+        calendar_end_at: calendarEndAt || null,
+        calendar_all_day: false,
       })
 
       if (record && status !== normalizeRecordStatus(record.status)) {
@@ -386,39 +410,53 @@ export default function RecordEditPage() {
         </View>
 
         <View className='form-item'>
-          <Text className='form-label'>截止时间</Text>
+          <Text className='form-label'>预约日期</Text>
+          <Picker
+            mode='date'
+            value={appointmentDate || todayDate()}
+            onChange={(e) => setAppointmentDate(String(e.detail.value))}
+          >
+            <View className='datetime-picker'>
+              {appointmentDate || '选择预约日期'}
+            </View>
+          </Picker>
+        </View>
 
-          <View className='datetime-row'>
-            <Picker
-              mode='date'
-              value={dueDate || todayDate()}
-              onChange={(e) => setDueDate(String(e.detail.value))}
-            >
-              <View className='datetime-picker'>
-                {dueDate || '选择日期'}
-              </View>
-            </Picker>
+        <View className='form-item'>
+          <Text className='form-label'>开始时间</Text>
+          <Picker
+            mode='time'
+            value={startTime || currentTime()}
+            onChange={(e) => setStartTime(String(e.detail.value))}
+          >
+            <View className='datetime-picker'>
+              {startTime || '选择开始时间'}
+            </View>
+          </Picker>
+        </View>
 
-            <Picker
-              mode='time'
-              value={dueTime || currentTime()}
-              onChange={(e) => setDueTime(String(e.detail.value))}
-            >
-              <View className='datetime-picker'>
-                {dueTime || '选择时间'}
-              </View>
-            </Picker>
-          </View>
+        <View className='form-item'>
+          <Text className='form-label'>结束时间</Text>
+          <Picker
+            mode='time'
+            value={endTime || currentTime()}
+            onChange={(e) => setEndTime(String(e.detail.value))}
+          >
+            <View className='datetime-picker'>
+              {endTime || '选择结束时间'}
+            </View>
+          </Picker>
 
-          {(dueDate || dueTime) && (
+          {(appointmentDate || startTime || endTime) && (
             <View
               className='clear-action'
               onClick={() => {
-                setDueDate('')
-                setDueTime('')
+                setAppointmentDate('')
+                setStartTime('')
+                setEndTime('')
               }}
             >
-              清除截止时间
+              清除预约时间
             </View>
           )}
         </View>

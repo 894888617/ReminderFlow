@@ -3,6 +3,7 @@ import Taro, { useDidShow, usePullDownRefresh, useRouter } from "@tarojs/taro";
 import { useMemo, useState } from "react";
 
 import {
+  createSpecialCalendarEvent,
   deleteCalendarEvent,
   getMemberWorkloadStats,
   getMonthlyCalendarStats,
@@ -198,23 +199,20 @@ function getEventTime(event: CalendarEvent) {
   return status === "blocked" && end ? `${start}-${end}` : start;
 }
 
-function getSpecialEventLabel(event: CalendarEvent) {
+function getEventTitle(event: CalendarEvent) {
   const status = getEventStatus(event);
-  const name = event.assignee_name || "未指定负责人";
-  if (status === "rest") return `${name}休息`;
-  if (status === "blocked") {
-    const start = (event.start_at || "").slice(11, 16);
-    const end = (event.end_at || "").slice(11, 16);
-    return `${name}不接${start && end ? ` ${start} - ${end}` : ""}`;
-  }
-  if (status === "full") return `${name}已满`;
-  return "";
+  if (status === "blocked") return "不接";
+  if (status === "rest") return "休息";
+  if (status === "full") return "已满";
+  return event.record_title || event.title || "未命名日程";
 }
 
-function getEventTitle(event: CalendarEvent) {
-  const specialLabel = getSpecialEventLabel(event);
-  if (specialLabel) return specialLabel;
-  return event.title || "未命名日程";
+function getEventRemark(event: CalendarEvent) {
+  return event.remark || event.content || event.record_content || "";
+}
+
+function hasCustomerInfo(event: CalendarEvent) {
+  return Boolean(event.customer_phone || event.customer_name);
 }
 
 function isSpecialEvent(event: CalendarEvent) {
@@ -510,7 +508,7 @@ export default function CalendarPage() {
     });
   };
 
-  const goSetSpecialDay = (date: string, type: "rest" | "blocked" | "full") => {
+  const goSetSpecialDay = async (date: string, type: "rest" | "blocked" | "full") => {
     if (!currentCalendarId) return;
     if (!writable) {
       Taro.showToast({ title: "你只有查看权限", icon: "none" });
@@ -518,9 +516,33 @@ export default function CalendarPage() {
     }
     const selectedAssignee =
       assigneeFilter || (currentUser?.id ? String(currentUser.id) : "");
-    const assigneeQuery = selectedAssignee
-      ? `&assignee_id=${selectedAssignee}`
-      : "";
+
+    if (!selectedAssignee) {
+      Taro.showToast({ title: "缺少负责人", icon: "none" });
+      return;
+    }
+
+    if (type === "full") {
+      try {
+        Taro.showLoading({ title: "设置中", mask: true });
+        await createSpecialCalendarEvent(currentCalendarId, {
+          date,
+          type: "full",
+          all_day: true,
+          assignee_id: Number(selectedAssignee),
+        });
+        await refreshCalendarData();
+        Taro.hideLoading();
+        Taro.showToast({ title: "已设置为已满", icon: "success" });
+      } catch (err) {
+        console.error(err);
+        Taro.hideLoading();
+        Taro.showToast({ title: "设置失败", icon: "none" });
+      }
+      return;
+    }
+
+    const assigneeQuery = `&assignee_id=${selectedAssignee}`;
     Taro.navigateTo({
       url: `/pages/schedule-special/index?calendar_id=${currentCalendarId}&selected_date=${date}&type=${type}${assigneeQuery}`,
     });
@@ -743,20 +765,23 @@ export default function CalendarPage() {
             <View className="timeline-time">{getEventTime(item)}</View>
             <View className="timeline-main">
               <View className="record-title">{getEventTitle(item)}</View>
+              {getEventRemark(item) ? (
+                <View className="record-remark">{getEventRemark(item)}</View>
+              ) : null}
               {!isSpecialEvent(item) ? (
                 <View className="record-assignee-name">
                   {item.assignee_name || "未分配"}
                 </View>
               ) : null}
-              {item.record_id ? (
+              {item.record_id && hasCustomerInfo(item) ? (
                 <View
                   className="history-link"
                   onClick={(event) => {
                     event.stopPropagation();
+                    const phone = item.customer_phone || "";
+                    const name = item.customer_name || "";
                     Taro.navigateTo({
-                      url: `/pages/customer-history/index?calendar_id=${currentCalendarId}&keyword=${encodeURIComponent(
-                        getEventTitle(item),
-                      )}`,
+                      url: `/pages/customer-history/index?calendar_id=${currentCalendarId}&customer_phone=${encodeURIComponent(phone)}&customer_name=${encodeURIComponent(name)}`,
                     });
                   }}
                 >

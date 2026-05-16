@@ -12,6 +12,12 @@ export interface RecordItem {
   assignee_name?: string;
   status: RecordStatus;
   due_at?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  service_name?: string;
+  calendar_start_at?: string;
+  calendar_end_at?: string | null;
+  calendar_all_day?: boolean;
   created_at: string;
   updated_at: string;
   current_user_role?: "owner" | "member" | "viewer" | "";
@@ -32,6 +38,8 @@ export interface RecordQueryParams {
   status?: RecordStatus | "";
   assignee_id?: number;
   keyword?: string;
+  customer_name?: string;
+  customer_phone?: string;
 }
 
 function buildQuery(params: RecordQueryParams) {
@@ -132,6 +140,12 @@ export interface UpdateRecordParams {
   content?: string;
   assignee_id?: number;
   due_at?: string;
+  calendar_start_at?: string;
+  calendar_end_at?: string | null;
+  calendar_all_day?: boolean;
+  customer_name?: string;
+  customer_phone?: string;
+  service_name?: string;
 }
 
 export function updateRecord(id: number, data: UpdateRecordParams) {
