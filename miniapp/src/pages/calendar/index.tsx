@@ -922,7 +922,7 @@ export default function CalendarPage() {
         <View className="day-grid appointment-grid">
           {getMonthDays(currentDate).map((item) => {
             const dayEvents = item.date ? eventsByDate[item.date] || [] : [];
-            const visibleEvents = dayEvents.slice(0, 8);
+            const visibleEvents = dayEvents.slice(0, 6);
             return (
               <View
                 key={item.key}
@@ -944,8 +944,8 @@ export default function CalendarPage() {
                     {getEventTitle(event)}
                   </View>
                 ))}
-                {dayEvents.length > 8 ? (
-                  <View className="event-more">+{dayEvents.length - 8}</View>
+                {dayEvents.length > 6 ? (
+                  <View className="event-more">+{dayEvents.length - 6}</View>
                 ) : null}
               </View>
             );
