@@ -36,6 +36,12 @@ type Record struct {
 	DueAt           *time.Time `json:"due_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	CustomerName    string     `json:"customer_name"`
+	CustomerPhone   string     `json:"customer_phone"`
+	ServiceName     string     `json:"service_name"`
+	CalendarStartAt *time.Time `json:"calendar_start_at"`
+	CalendarEndAt   *time.Time `json:"calendar_end_at"`
+	CalendarAllDay  *bool      `json:"calendar_all_day"`
 	CurrentUserRole string     `json:"current_user_role"`
 }
 
@@ -107,7 +113,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	}
 
 	if params.CalendarStartAt != nil {
-		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
+		if err := r.checkScheduleConflict(ctx, params.CalendarID, 0, params.CalendarStartAt, params.CalendarEndAt); err != nil {
 			return nil, err
 		}
 	}
@@ -138,6 +144,9 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			assignee_id,
 			status,
 			due_at,
+			COALESCE(customer_name, ''),
+			COALESCE(customer_phone, ''),
+			COALESCE(service_name, ''),
 			created_at,
 			updated_at
 	`,
@@ -161,6 +170,9 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		&rec.AssigneeID,
 		&rec.Status,
 		&rec.DueAt,
+		&rec.CustomerName,
+		&rec.CustomerPhone,
+		&rec.ServiceName,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
 	)
@@ -212,13 +224,16 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	return &rec, nil
 }
 
-func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64, startAt *time.Time, endAt *time.Time) error {
+func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64, ignoreRecordID int64, startAt *time.Time, endAt *time.Time) error {
 	if startAt == nil {
 		return nil
 	}
-	_ = endAt
 	dayStart := time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 0, 0, 0, 0, startAt.Location())
 	dayEnd := dayStart.AddDate(0, 0, 1)
+	effectiveEnd := dayEnd
+	if endAt != nil {
+		effectiveEnd = *endAt
+	}
 
 	var blockedCount int64
 	if err := r.db.QueryRow(ctx, `
@@ -231,8 +246,15 @@ func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64
 		  AND (
 		    LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'full')
 		    OR (LOWER(COALESCE(ce.event_type, 'record')) = 'blocked' AND ce.all_day = true)
+		    OR (
+		      LOWER(COALESCE(ce.event_type, 'record')) = 'blocked'
+		      AND ce.all_day = false
+		      AND ce.start_at < $5
+		      AND COALESCE(ce.end_at, ce.start_at) > $2
+		    )
 		  )
-	`, calendarID, dayStart, dayEnd).Scan(&blockedCount); err != nil {
+		  AND ($4::bigint = 0 OR COALESCE(ce.record_id, 0) <> $4)
+	`, calendarID, dayStart, dayEnd, ignoreRecordID, effectiveEnd).Scan(&blockedCount); err != nil {
 		return err
 	}
 	if blockedCount > 0 {
@@ -245,6 +267,7 @@ func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64
 func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParams) (*PageResult, error) {
 	whereParts := []string{
 		"rec.calendar_id = $1",
+		"rec.deleted_at IS NULL",
 	}
 
 	args := []any{params.CalendarID}
@@ -279,10 +302,18 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 		argIndex++
 	}
 
-	if params.Keyword != "" {
+	if params.CustomerPhone != "" {
+		whereParts = append(whereParts, fmt.Sprintf("rec.customer_phone = $%d", argIndex))
+		args = append(args, params.CustomerPhone)
+		argIndex++
+	} else if params.CustomerName != "" {
+		whereParts = append(whereParts, fmt.Sprintf("rec.customer_name ILIKE $%d", argIndex))
+		args = append(args, "%"+params.CustomerName+"%")
+		argIndex++
+	} else if params.Keyword != "" {
 		whereParts = append(
 			whereParts,
-			fmt.Sprintf("(rec.title ILIKE $%d OR rec.content ILIKE $%d)", argIndex, argIndex),
+			fmt.Sprintf("(rec.title ILIKE $%d OR rec.content ILIKE $%d OR rec.customer_name ILIKE $%d OR rec.customer_phone ILIKE $%d OR rec.service_name ILIKE $%d)", argIndex, argIndex, argIndex, argIndex, argIndex),
 		)
 		args = append(args, "%"+params.Keyword+"%")
 		argIndex++
@@ -315,10 +346,23 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			rec.status,
 			rec.due_at,
+			COALESCE(rec.customer_name, ''),
+			COALESCE(rec.customer_phone, ''),
+			COALESCE(rec.service_name, ''),
+			ce.start_at,
+			ce.end_at,
+			ce.all_day,
 			rec.created_at,
 			rec.updated_at
 		FROM records rec
 		LEFT JOIN users u ON u.id = rec.assignee_id
+		LEFT JOIN LATERAL (
+			SELECT start_at, end_at, all_day
+			FROM calendar_events
+			WHERE record_id = rec.id AND deleted_at IS NULL
+			ORDER BY start_at ASC, id ASC
+			LIMIT 1
+		) ce ON TRUE
 		WHERE %s
 		ORDER BY 
 			CASE 
@@ -357,6 +401,12 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 			&rec.AssigneeName,
 			&rec.Status,
 			&rec.DueAt,
+			&rec.CustomerName,
+			&rec.CustomerPhone,
+			&rec.ServiceName,
+			&rec.CalendarStartAt,
+			&rec.CalendarEndAt,
+			&rec.CalendarAllDay,
 			&rec.CreatedAt,
 			&rec.UpdatedAt,
 		); err != nil {
@@ -419,11 +469,25 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			rec.status,
 			rec.due_at,
+			COALESCE(rec.customer_name, ''),
+			COALESCE(rec.customer_phone, ''),
+			COALESCE(rec.service_name, ''),
+			ce.start_at,
+			ce.end_at,
+			ce.all_day,
 			rec.created_at,
 			rec.updated_at
 		FROM records rec
 		LEFT JOIN users u ON u.id = rec.assignee_id
+		LEFT JOIN LATERAL (
+			SELECT start_at, end_at, all_day
+			FROM calendar_events
+			WHERE record_id = rec.id AND deleted_at IS NULL
+			ORDER BY start_at ASC, id ASC
+			LIMIT 1
+		) ce ON TRUE
 		WHERE rec.id = $1
+		  AND rec.deleted_at IS NULL
 	`, id).Scan(
 		&rec.ID,
 		&rec.WorkspaceID,
@@ -435,6 +499,12 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 		&rec.AssigneeName,
 		&rec.Status,
 		&rec.DueAt,
+		&rec.CustomerName,
+		&rec.CustomerPhone,
+		&rec.ServiceName,
+		&rec.CalendarStartAt,
+		&rec.CalendarEndAt,
+		&rec.CalendarAllDay,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
 	)
@@ -461,16 +531,30 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			rec.status,
 			rec.due_at,
+			COALESCE(rec.customer_name, ''),
+			COALESCE(rec.customer_phone, ''),
+			COALESCE(rec.service_name, ''),
+			ce.start_at,
+			ce.end_at,
+			ce.all_day,
 			rec.created_at,
 			rec.updated_at,
 			COALESCE(wm.role, '')
 		FROM records rec
 		LEFT JOIN users u ON u.id = rec.assignee_id
+		LEFT JOIN LATERAL (
+			SELECT start_at, end_at, all_day
+			FROM calendar_events
+			WHERE record_id = rec.id AND deleted_at IS NULL
+			ORDER BY start_at ASC, id ASC
+			LIMIT 1
+		) ce ON TRUE
 		LEFT JOIN calendar_members wm
 			ON wm.calendar_id = rec.calendar_id
 			AND wm.user_id = $2
 			AND wm.status = 'active'
 		WHERE rec.id = $1
+		  AND rec.deleted_at IS NULL
 	`, recordID, userID).Scan(
 		&item.ID,
 		&item.WorkspaceID,
@@ -482,6 +566,12 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 		&item.AssigneeName,
 		&item.Status,
 		&item.DueAt,
+		&item.CustomerName,
+		&item.CustomerPhone,
+		&item.ServiceName,
+		&item.CalendarStartAt,
+		&item.CalendarEndAt,
+		&item.CalendarAllDay,
 		&item.CreatedAt,
 		&item.UpdatedAt,
 		&item.CurrentUserRole,
@@ -495,29 +585,96 @@ func (r *Repository) GetDetailWithRole(ctx context.Context, recordID int64, user
 }
 
 type UpdateRecordParams struct {
-	ID         int64
-	Title      string
-	Content    string
-	AssigneeID *int64
-	DueAt      *time.Time
+	ID               int64
+	CalendarID       int64
+	UpdatedBy        int64
+	Title            string
+	Content          string
+	AssigneeID       *int64
+	DueAt            *time.Time
+	CalendarStartAt  *time.Time
+	CalendarEndAt    *time.Time
+	CalendarAllDay   bool
+	UpdateCalendarAt bool
+	CustomerName     string
+	CustomerPhone    string
+	ServiceName      string
 }
 
 func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Record, error) {
-	var id int64
+	if params.UpdateCalendarAt && params.CalendarStartAt != nil {
+		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.ID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
+			return nil, err
+		}
+	}
 
-	err := r.db.QueryRow(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var id int64
+	err = tx.QueryRow(ctx, `
 		UPDATE records
 		SET
 			title = $2,
 			content = $3,
 			assignee_id = $4,
 			due_at = $5,
+			customer_name = $6,
+			customer_phone = $7,
+			service_name = $8,
 			updated_at = NOW()
 		WHERE id = $1
+		  AND deleted_at IS NULL
 		RETURNING id
-	`, params.ID, params.Title, params.Content, params.AssigneeID, params.DueAt).Scan(&id)
-
+	`, params.ID, params.Title, params.Content, params.AssigneeID, params.DueAt, strings.TrimSpace(params.CustomerName), strings.TrimSpace(params.CustomerPhone), strings.TrimSpace(params.ServiceName)).Scan(&id)
 	if err != nil {
+		return nil, err
+	}
+
+	if params.UpdateCalendarAt {
+		if params.CalendarStartAt != nil {
+			commandTag, err := tx.Exec(ctx, `
+				UPDATE calendar_events
+				SET title = $2,
+					start_at = $3,
+					end_at = $4,
+					all_day = $5,
+					assignee_id = $6,
+					updated_at = NOW()
+				WHERE record_id = $1
+				  AND deleted_at IS NULL
+			`, params.ID, params.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AssigneeID)
+			if err != nil {
+				return nil, err
+			}
+			if commandTag.RowsAffected() == 0 {
+				_, err = tx.Exec(ctx, `
+					INSERT INTO calendar_events (
+						calendar_id, record_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by, assignee_id
+					)
+					VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', 'pending', 'appointment', $8, $7)
+				`, params.CalendarID, params.ID, params.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AssigneeID, params.UpdatedBy)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			_, err := tx.Exec(ctx, `
+				UPDATE calendar_events
+				SET deleted_at = NOW()
+				WHERE record_id = $1
+				  AND deleted_at IS NULL
+			`, params.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -623,6 +780,12 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
 			rec.status,
 			rec.due_at,
+			COALESCE(rec.customer_name, ''),
+			COALESCE(rec.customer_phone, ''),
+			COALESCE(rec.service_name, ''),
+			ce.start_at,
+			ce.end_at,
+			ce.all_day,
 			rec.created_at,
 			rec.updated_at
 		FROM records rec
@@ -657,6 +820,12 @@ func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, e
 			&rec.AssigneeName,
 			&rec.Status,
 			&rec.DueAt,
+			&rec.CustomerName,
+			&rec.CustomerPhone,
+			&rec.ServiceName,
+			&rec.CalendarStartAt,
+			&rec.CalendarEndAt,
+			&rec.CalendarAllDay,
 			&rec.CreatedAt,
 			&rec.UpdatedAt,
 		); err != nil {
@@ -818,14 +987,16 @@ func (r *Repository) CreateNotification(ctx context.Context, userID int64, recor
 }
 
 type ListRecordsParams struct {
-	CalendarID int64
-	Page       int
-	PageSize   int
-	Status     string
-	AssigneeID *int64
-	Keyword    string
-	StartDate  string
-	EndDate    string
+	CalendarID    int64
+	Page          int
+	PageSize      int
+	Status        string
+	AssigneeID    *int64
+	Keyword       string
+	CustomerName  string
+	CustomerPhone string
+	StartDate     string
+	EndDate       string
 }
 
 type PageResult struct {

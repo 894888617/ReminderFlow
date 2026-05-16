@@ -415,6 +415,10 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			ce.title,
 			COALESCE(rec.title, ''),
 			COALESCE(rec.content, ''),
+			COALESCE(ce.content, ''),
+			COALESCE(rec.customer_name, ''),
+			COALESCE(rec.customer_phone, ''),
+			COALESCE(rec.service_name, ''),
 			%s,
 			LOWER(COALESCE(ce.event_type, 'record')),
 			COALESCE(rec.assignee_id, ce.assignee_id),
@@ -455,6 +459,10 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			&item.Title,
 			&item.RecordTitle,
 			&item.RecordContent,
+			&item.Content,
+			&item.CustomerName,
+			&item.CustomerPhone,
+			&item.ServiceName,
 			&item.Status,
 			&item.EventType,
 			&item.AssigneeID,
@@ -466,6 +474,7 @@ func (r *Repository) ListCalendarEvents(ctx context.Context, userID, calendarID 
 			return nil, err
 		}
 		item.ID = item.EventID
+		item.Remark = item.Content
 		item.StartAt = formatShanghaiTimestamp(start)
 		if end != nil {
 			formatted := formatShanghaiTimestamp(*end)
@@ -520,11 +529,12 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 			calendar_id, title, start_at, end_at, all_day, timezone, status, event_type, created_by, assignee_id, content
 		)
 		VALUES ($1, $2, $3, $4, $5, 'Asia/Shanghai', $6, $6, $7, $8, $9)
-		RETURNING id, calendar_id, title, status, event_type, assignee_id, start_at, end_at, all_day
+		RETURNING id, calendar_id, title, COALESCE(content, ''), status, event_type, assignee_id, start_at, end_at, all_day
 	`, calendarID, title, startAt, endAt, allDay, params.EventType, userID, params.AssigneeID, strings.TrimSpace(params.Remark)).Scan(
 		&item.EventID,
 		&item.CalendarID,
 		&item.Title,
+		&item.Content,
 		&item.Status,
 		&item.EventType,
 		&item.AssigneeID,
@@ -536,6 +546,7 @@ func (r *Repository) CreateSpecialEvent(ctx context.Context, userID, calendarID 
 		return nil, err
 	}
 	item.ID = item.EventID
+	item.Remark = item.Content
 	item.StartAt = formatShanghaiTimestamp(start)
 	if end != nil {
 		formatted := formatShanghaiTimestamp(*end)

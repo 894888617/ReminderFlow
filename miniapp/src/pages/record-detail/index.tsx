@@ -29,6 +29,26 @@ function formatDateTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 16)
 }
 
+function formatAppointmentTime(record: RecordItem) {
+  const start = record.calendar_start_at || record.due_at
+  const end = record.calendar_end_at
+
+  if (!start) return '未设置'
+
+  const date = start.slice(0, 10)
+  const startTime = start.slice(11, 16)
+
+  if (record.calendar_all_day) {
+    return `${date} 全天`
+  }
+
+  if (end) {
+    return `${date} ${startTime} - ${end.slice(11, 16)}`
+  }
+
+  return `${date} ${startTime}`
+}
+
 export default function RecordDetailPage() {
   const router = useRouter()
   const recordId = Number(router.params.id)
@@ -255,8 +275,23 @@ export default function RecordDetailPage() {
         </View>
 
         <View className='info-row'>
-          <Text className='info-label'>截止时间</Text>
-          <Text className='info-value'>{formatDateTime(record.due_at)}</Text>
+          <Text className='info-label'>预约时间</Text>
+          <Text className='info-value'>{formatAppointmentTime(record)}</Text>
+        </View>
+
+        <View className='info-row'>
+          <Text className='info-label'>客户姓名</Text>
+          <Text className='info-value'>{record.customer_name || '-'}</Text>
+        </View>
+
+        <View className='info-row'>
+          <Text className='info-label'>客户手机号</Text>
+          <Text className='info-value'>{record.customer_phone || '-'}</Text>
+        </View>
+
+        <View className='info-row'>
+          <Text className='info-label'>服务项目</Text>
+          <Text className='info-value'>{record.service_name || '-'}</Text>
         </View>
 
         <View className='info-row'>

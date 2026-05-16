@@ -59,6 +59,11 @@ type CalendarEvent struct {
 	Title           string  `json:"title"`
 	RecordTitle     string  `json:"record_title"`
 	RecordContent   string  `json:"record_content"`
+	Content         string  `json:"content"`
+	Remark          string  `json:"remark"`
+	CustomerName    string  `json:"customer_name"`
+	CustomerPhone   string  `json:"customer_phone"`
+	ServiceName     string  `json:"service_name"`
 	Status          string  `json:"status"`
 	EventType       string  `json:"event_type"`
 	AssigneeID      *int64  `json:"assignee_id"`
