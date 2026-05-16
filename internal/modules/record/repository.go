@@ -112,8 +112,8 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.AppointmentStatus = "pending"
 	}
 
-	if params.CalendarStartAt != nil {
-		if err := r.checkScheduleConflict(ctx, params.CalendarID, 0, params.CalendarStartAt, params.CalendarEndAt); err != nil {
+	if shouldCheckScheduleConflict(params.CalendarID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AppointmentStatus) {
+		if err := r.checkScheduleConflict(ctx, params.CalendarID, 0, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
 			return nil, err
 		}
 	}
@@ -208,10 +208,11 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 				timezone,
 				status,
 				event_type,
-				created_by
+				created_by,
+				assignee_id
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', $7, 'appointment', $8)
-		`, params.CalendarID, rec.ID, rec.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AppointmentStatus, params.CreatorID)
+			VALUES ($1, $2, $3, $4, $5, $6, 'Asia/Shanghai', $7, 'appointment', $8, $9)
+		`, params.CalendarID, rec.ID, rec.Title, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.AppointmentStatus, params.CreatorID, params.AssigneeID)
 		if err != nil {
 			return nil, err
 		}
@@ -224,40 +225,75 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	return &rec, nil
 }
 
-func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64, ignoreRecordID int64, startAt *time.Time, endAt *time.Time) error {
-	if startAt == nil {
+func shouldCheckScheduleConflict(calendarID int64, assigneeID *int64, startAt *time.Time, endAt *time.Time, allDay bool, status string) bool {
+	if calendarID <= 0 || assigneeID == nil || startAt == nil || endAt == nil || allDay {
+		return false
+	}
+	return !isTerminalRecordStatus(status)
+}
+
+func isTerminalRecordStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "done", "cancelled", "completed":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Repository) checkScheduleConflict(ctx context.Context, calendarID int64, ignoreRecordID int64, assigneeID *int64, startAt *time.Time, endAt *time.Time) error {
+	if assigneeID == nil || startAt == nil || endAt == nil {
 		return nil
 	}
 	dayStart := time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 0, 0, 0, 0, startAt.Location())
 	dayEnd := dayStart.AddDate(0, 0, 1)
-	effectiveEnd := dayEnd
-	if endAt != nil {
-		effectiveEnd = *endAt
-	}
 
-	var blockedCount int64
+	var conflictCount int64
 	if err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*)
 		FROM calendar_events ce
+		LEFT JOIN records rec ON rec.id = ce.record_id
 		WHERE ce.calendar_id = $1
 		  AND ce.deleted_at IS NULL
-		  AND ce.start_at >= $2
-		  AND ce.start_at < $3
+		  AND (rec.id IS NULL OR rec.deleted_at IS NULL)
+		  AND ($5::bigint = 0 OR COALESCE(ce.record_id, 0) <> $5)
+		  AND LOWER(COALESCE(ce.status, '')) NOT IN ('done', 'cancelled', 'completed')
+		  AND LOWER(COALESCE(rec.status, '')) NOT IN ('done', 'cancelled', 'completed')
+		  AND LOWER(COALESCE(ce.event_type, 'record')) IN ('record', 'appointment', 'blocked', 'rest', 'full')
 		  AND (
-		    LOWER(COALESCE(ce.event_type, 'record')) IN ('rest', 'full')
-		    OR (LOWER(COALESCE(ce.event_type, 'record')) = 'blocked' AND ce.all_day = true)
+		    (
+		      LOWER(COALESCE(ce.event_type, 'record')) IN ('record', 'appointment')
+		      AND COALESCE(ce.assignee_id, rec.assignee_id) = $2
+		      AND ce.end_at IS NOT NULL
+		      AND ce.start_at < $4
+		      AND ce.end_at > $3
+		    )
+		    OR (
+		      LOWER(COALESCE(ce.event_type, 'record')) = 'rest'
+		      AND (COALESCE(ce.assignee_id, rec.assignee_id) = $2 OR COALESCE(ce.assignee_id, rec.assignee_id) IS NULL)
+		      AND (
+		        (ce.all_day = true AND ce.start_at < $7 AND COALESCE(ce.end_at, ce.start_at + INTERVAL '1 day') > $6)
+		        OR (ce.all_day = false AND ce.end_at IS NOT NULL AND ce.start_at < $4 AND ce.end_at > $3)
+		      )
+		    )
 		    OR (
 		      LOWER(COALESCE(ce.event_type, 'record')) = 'blocked'
-		      AND ce.all_day = false
-		      AND ce.start_at < $5
-		      AND COALESCE(ce.end_at, ce.start_at) > $2
+		      AND (COALESCE(ce.assignee_id, rec.assignee_id) = $2 OR COALESCE(ce.assignee_id, rec.assignee_id) IS NULL)
+		      AND ce.end_at IS NOT NULL
+		      AND ce.start_at < $4
+		      AND ce.end_at > $3
+		    )
+		    OR (
+		      LOWER(COALESCE(ce.event_type, 'record')) = 'full'
+		      AND (COALESCE(ce.assignee_id, rec.assignee_id) = $2 OR COALESCE(ce.assignee_id, rec.assignee_id) IS NULL)
+		      AND ce.start_at < $7
+		      AND COALESCE(ce.end_at, ce.start_at + INTERVAL '1 day') > $6
 		    )
 		  )
-		  AND ($4::bigint = 0 OR COALESCE(ce.record_id, 0) <> $4)
-	`, calendarID, dayStart, dayEnd, ignoreRecordID, effectiveEnd).Scan(&blockedCount); err != nil {
+	`, calendarID, *assigneeID, *startAt, *endAt, ignoreRecordID, dayStart, dayEnd).Scan(&conflictCount); err != nil {
 		return err
 	}
-	if blockedCount > 0 {
+	if conflictCount > 0 {
 		return ErrScheduleConflict
 	}
 
@@ -595,6 +631,7 @@ type UpdateRecordParams struct {
 	CalendarStartAt  *time.Time
 	CalendarEndAt    *time.Time
 	CalendarAllDay   bool
+	Status           string
 	UpdateCalendarAt bool
 	CustomerName     string
 	CustomerPhone    string
@@ -602,8 +639,8 @@ type UpdateRecordParams struct {
 }
 
 func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Record, error) {
-	if params.UpdateCalendarAt && params.CalendarStartAt != nil {
-		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.ID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
+	if params.UpdateCalendarAt && shouldCheckScheduleConflict(params.CalendarID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt, params.CalendarAllDay, params.Status) {
+		if err := r.checkScheduleConflict(ctx, params.CalendarID, params.ID, params.AssigneeID, params.CalendarStartAt, params.CalendarEndAt); err != nil {
 			return nil, err
 		}
 	}

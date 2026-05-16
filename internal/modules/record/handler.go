@@ -167,7 +167,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	if err != nil {
 		if errors.Is(err, ErrScheduleConflict) {
-			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "msg": "该时间段已有安排"})
+			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "message": "该负责人该时间段已有安排", "msg": "该负责人该时间段已有安排"})
 			return
 		}
 		response.Internal(c, "create record failed")
@@ -507,6 +507,7 @@ func (h *Handler) Update(c *gin.Context) {
 		CalendarStartAt:  calendarStartAt,
 		CalendarEndAt:    calendarEndAt,
 		CalendarAllDay:   calendarAllDay,
+		Status:           oldRec.Status,
 		UpdateCalendarAt: updateCalendarAt,
 		CustomerName:     req.CustomerName,
 		CustomerPhone:    req.CustomerPhone,
@@ -514,6 +515,10 @@ func (h *Handler) Update(c *gin.Context) {
 	})
 
 	if err != nil {
+		if errors.Is(err, ErrScheduleConflict) {
+			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "message": "该负责人该时间段已有安排", "msg": "该负责人该时间段已有安排"})
+			return
+		}
 		response.Internal(c, "update record failed")
 		return
 	}

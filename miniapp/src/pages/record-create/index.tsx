@@ -233,7 +233,6 @@ export default function RecordCreatePage() {
     const finalAppointmentDate = appointmentDate || defaultAppointmentDate;
     const finalStartTime = startTime.trim();
     const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
-    const isAllDayAppointment = !finalStartTime;
 
     try {
       setSubmitting(true);
@@ -257,9 +256,6 @@ export default function RecordCreatePage() {
           .join("\n"),
         assignee_id: assigneeId,
         due_at: calendarStartAt,
-        calendar_start_at: calendarStartAt,
-        calendar_end_at: null,
-        calendar_all_day: isAllDayAppointment,
         appointment_status: statusOptions[statusIndex].value,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
@@ -290,9 +286,16 @@ export default function RecordCreatePage() {
           url: `/pages/record-detail/index?id=${record.id}`,
         });
       }, 500);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       Taro.hideLoading();
+
+      if (err?.code === "SCHEDULE_CONFLICT") {
+        Taro.showToast({
+          title: "该时间段已有安排，请调整时间",
+          icon: "none",
+        });
+      }
     } finally {
       setSubmitting(false);
     }
