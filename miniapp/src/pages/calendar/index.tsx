@@ -634,6 +634,11 @@ export default function CalendarPage() {
     });
   };
 
+  const goCustomer = () => {
+    if (!currentCalendarId) { Taro.showToast({ title: "请先选择空间", icon: "none" }); return; }
+    Taro.navigateTo({ url: `/pages/customer/index?calendar_id=${currentCalendarId}` });
+  };
+
   const goProfile = () => {
     Taro.navigateTo({ url: "/pages/profile/index" });
   };
@@ -736,6 +741,7 @@ export default function CalendarPage() {
             <View className="nav-account-avatar">{accountAvatarText}</View>
             <View className="nav-account-text">{accountText}</View>
           </View>
+          <View className="nav-config-btn" onClick={goCustomer}>客户</View>
           <View className="nav-config-btn" onClick={handleOpenCalendarActions}>
             ⚙
           </View>

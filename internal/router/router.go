@@ -1,7 +1,9 @@
 package router
 
 import (
+	"reminder-flow/internal/modules/appointmentproject"
 	"reminder-flow/internal/modules/calendar"
+	"reminder-flow/internal/modules/customer"
 	"reminder-flow/internal/modules/invite"
 	"reminder-flow/internal/modules/mobile"
 	"reminder-flow/internal/modules/notification"
@@ -103,6 +105,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 	recordRepo := record.NewRepository(db)
 	recordHandler := record.NewHandler(recordRepo, subscriptionService)
+	customerHandler := customer.NewHandler(customer.NewRepository(db))
+	projectHandler := appointmentproject.NewHandler(db)
 
 	api := r.Group("/api")
 	{
@@ -139,6 +143,16 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.PUT("/calendar-events/:event_id/time", calendarHandler.UpdateEventTime)
 			authGroup.DELETE("/calendar-events/:event_id", calendarHandler.DeleteEvent)
 
+			authGroup.GET("/calendars/:calendar_id/customers", customerHandler.List)
+			authGroup.POST("/calendars/:calendar_id/customers", customerHandler.Create)
+			authGroup.GET("/customers/:id", customerHandler.Get)
+			authGroup.PUT("/customers/:id", customerHandler.Update)
+			authGroup.DELETE("/customers/:id", customerHandler.Delete)
+
+			authGroup.GET("/calendars/:calendar_id/appointment-projects", projectHandler.List)
+			authGroup.POST("/calendars/:calendar_id/appointment-projects", projectHandler.Create)
+			authGroup.PUT("/appointment-projects/:id", projectHandler.Update)
+			authGroup.DELETE("/appointment-projects/:id", projectHandler.Delete)
 			authGroup.POST("/records", recordHandler.Create)
 			authGroup.GET("/records", recordHandler.List)
 
