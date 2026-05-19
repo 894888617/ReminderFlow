@@ -286,11 +286,7 @@ export default function RecordCreatePage() {
         console.log('create record payload', payload);
       }
 
-      const created = await createRecord(payload);
-      const newRecordId = Number(created?.id || 0);
-      if (!newRecordId) {
-        throw new Error('invalid record id');
-      }
+      await createRecord(payload);
 
       Taro.showToast({
         title: "创建成功",
@@ -306,8 +302,12 @@ export default function RecordCreatePage() {
       });
 
       setTimeout(() => {
-        Taro.redirectTo({ url: `/pages/record-detail/index?id=${newRecordId}` });
-      }, 500);
+        returnToCalendar({
+          currentCalendarId: calendarId,
+          currentDate: currentDate || finalAppointmentDate,
+          selectedDate: finalAppointmentDate,
+        });
+      }, 300);
     } catch (err: any) {
       console.error(err);
 
@@ -344,11 +344,7 @@ export default function RecordCreatePage() {
         }
 
         Taro.showLoading({ title: "保存中...", mask: true });
-        const created = await createRecord(retryPayload);
-        const newRecordId = Number(created?.id || 0);
-        if (!newRecordId) {
-          throw new Error('invalid record id');
-        }
+        await createRecord(retryPayload);
 
         if (useExisting) {
           setCustomerId(existingCustomerId);
@@ -369,8 +365,12 @@ export default function RecordCreatePage() {
           selected_date: finalAppointmentDate,
         });
         setTimeout(() => {
-          Taro.redirectTo({ url: `/pages/record-detail/index?id=${newRecordId}` });
-        }, 500);
+          returnToCalendar({
+            currentCalendarId: calendarId,
+            currentDate: currentDate || finalAppointmentDate,
+            selectedDate: finalAppointmentDate,
+          });
+        }, 300);
         return;
       } else {
         Taro.showToast({ title: '创建预约失败，请稍后重试', icon: 'none' });

@@ -5,9 +5,7 @@ import { useState } from 'react'
 import {
   deleteRecord,
   getRecordDetail,
-  getRecordLogs,
   updateRecordStatus,
-  type OperationLog,
   type RecordItem,
 } from '../../api/record'
 import {
@@ -55,7 +53,7 @@ export default function RecordDetailPage() {
   const recordId = Number(router.params.id)
 
   const [record, setRecord] = useState<RecordItem | null>(null)
-  const [logs, setLogs] = useState<OperationLog[]>([])
+  const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -97,13 +95,7 @@ export default function RecordDetailPage() {
       const detail = await getRecordDetail(recordId)
 
       setRecord(detail)
-      try {
-        const logList = await getRecordLogs(recordId)
-        setLogs(Array.isArray(logList) ? logList : [])
-      } catch (logErr) {
-        console.warn('load logs failed', logErr)
-        setLogs([])
-      }
+      setLogs([])
     } catch (err: any) {
       console.error(err)
       setRecord(null)
@@ -189,8 +181,6 @@ export default function RecordDetailPage() {
           })
 
           await deleteRecord(record.id)
-
-          Taro.hideLoading()
           Taro.showToast({
             title: '删除成功',
             icon: 'success',
@@ -207,8 +197,9 @@ export default function RecordDetailPage() {
           }, 500)
         } catch (err) {
           console.error(err)
-          Taro.hideLoading()
+          Taro.showToast({ title: '删除失败，请稍后重试', icon: 'none' })
         } finally {
+          Taro.hideLoading()
           setDeleting(false)
         }
       },
