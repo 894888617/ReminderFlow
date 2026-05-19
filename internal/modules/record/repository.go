@@ -662,6 +662,10 @@ type UpdateRecordParams struct {
 	CustomerName     string
 	CustomerPhone    string
 	ServiceName      string
+	CustomerID       *int64
+	CustomerRemark   string
+	ProjectID        *int64
+	ProjectName      string
 }
 
 func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Record, error) {
