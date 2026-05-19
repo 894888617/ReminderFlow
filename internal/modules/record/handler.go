@@ -43,7 +43,6 @@ type CreateRecordRequest struct {
 	Content           string  `json:"content"`
 	AssigneeID        *int64  `json:"assignee_id"`
 	DueAt             string  `json:"due_at"`
-	RemindAt          string  `json:"remind_at"`
 	CalendarStartAt   string  `json:"calendar_start_at"`
 	CalendarEndAt     *string `json:"calendar_end_at"`
 	CalendarAllDay    *bool   `json:"calendar_all_day"`
@@ -124,11 +123,6 @@ func (h *Handler) Create(c *gin.Context) {
 
 	dueAt := parseOptionalRFC3339Lenient(req.DueAt)
 
-	remindAt, ok := parseOptionalRFC3339(c, req.RemindAt, "remind_at")
-	if !ok {
-		return
-	}
-
 	calendarStartAt := parseOptionalRFC3339Lenient(req.CalendarStartAt)
 	if calendarStartAt == nil {
 		calendarStartAt = dueAt
@@ -183,7 +177,6 @@ func (h *Handler) Create(c *gin.Context) {
 		CalendarStartAt:   calendarStartAt,
 		CalendarEndAt:     calendarEndAt,
 		CalendarAllDay:    calendarAllDay,
-		RemindAt:          remindAt,
 		AppointmentStatus: strings.ToLower(NormalizeRecordStatus(req.AppointmentStatus)),
 		CustomerID:        req.CustomerID,
 		CustomerName:      req.CustomerName,
@@ -381,9 +374,6 @@ func parseCalendarID(c *gin.Context) (int64, bool) {
 	if value == "" {
 		value = strings.TrimSpace(c.Query("calendar_id"))
 	}
-	if value == "" {
-		value = strings.TrimSpace(c.Query("workspace_id"))
-	}
 
 	calendarID, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || calendarID <= 0 {
@@ -392,21 +382,6 @@ func parseCalendarID(c *gin.Context) (int64, bool) {
 	}
 
 	return calendarID, true
-}
-
-func parseOptionalRFC3339(c *gin.Context, value string, field string) (*time.Time, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, true
-	}
-
-	parsed, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		response.BadRequest(c, "invalid "+field+" format, use RFC3339")
-		return nil, false
-	}
-
-	return &parsed, true
 }
 
 func parseOptionalRFC3339Lenient(value string) *time.Time {
@@ -724,55 +699,6 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	})
 
 	response.OK(c, rec)
-}
-
-func (h *Handler) ListOverdue(c *gin.Context) {
-	currentUserID, ok := middleware.GetCurrentUserID(c)
-	if !ok {
-		response.Unauthorized(c, "unauthorized")
-		return
-	}
-
-	list, err := h.repo.ListOverdue(c.Request.Context(), currentUserID)
-	if err != nil {
-		response.Internal(c, "query overdue records failed")
-		return
-	}
-
-	response.OK(c, list)
-}
-
-func (h *Handler) ListOperationLogs(c *gin.Context) {
-	currentUserID, ok := middleware.GetCurrentUserID(c)
-	if !ok {
-		response.Unauthorized(c, "unauthorized")
-		return
-	}
-
-	recordID, ok := parseRecordID(c)
-	if !ok {
-		return
-	}
-
-	rec, err := h.repo.FindByID(c.Request.Context(), recordID)
-	if err != nil {
-		response.NotFound(c, "record not found")
-		return
-	}
-
-	_, err = h.repo.GetCalendarMemberRole(c.Request.Context(), rec.CalendarID, currentUserID)
-	if err != nil {
-		response.Forbidden(c, "no permission")
-		return
-	}
-
-	list, err := h.repo.ListOperationLogsByRecordID(c.Request.Context(), recordID)
-	if err != nil {
-		response.Internal(c, "query operation logs failed")
-		return
-	}
-
-	response.OK(c, list)
 }
 
 type TransferAssigneeRequest struct {

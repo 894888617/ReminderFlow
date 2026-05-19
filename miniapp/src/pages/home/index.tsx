@@ -56,9 +56,7 @@ export default function HomePage() {
   const hasAnyRecord = (data?.recent_records || []).length > 0
   const hasNoTasks =
     (data?.today_due_count || 0) === 0 &&
-    (data?.today_reminder_count || 0) === 0 &&
     (data?.unfinished_count || 0) === 0 &&
-    (data?.overdue_count || 0) === 0 &&
     !hasAnyRecord
   const shouldShowCalendarActions = Boolean(
     data && calendarsLoaded && hasNoTasks
@@ -88,18 +86,18 @@ export default function HomePage() {
         </View>
 
         <View className='summary-card'>
-          <Text className='summary-value'>{data?.today_reminder_count || 0}</Text>
-          <Text className='summary-label'>今日提醒</Text>
+          <Text className='summary-value'>{data?.unfinished_count || 0}</Text>
+          <Text className='summary-label'>待处理</Text>
         </View>
 
         <View className='summary-card'>
-          <Text className='summary-value'>{data?.unfinished_count || 0}</Text>
-          <Text className='summary-label'>未完成</Text>
+          <Text className='summary-value'>{(data?.recent_records || []).length || 0}</Text>
+          <Text className='summary-label'>近期预约</Text>
         </View>
 
         <View className='summary-card danger'>
-          <Text className='summary-value'>{data?.overdue_count || 0}</Text>
-          <Text className='summary-label'>逾期任务</Text>
+          <Text className='summary-value'>{calendars.length || 0}</Text>
+          <Text className='summary-label'>日历数量</Text>
         </View>
       </View>
 

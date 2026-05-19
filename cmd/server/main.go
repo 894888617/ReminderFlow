@@ -2,9 +2,6 @@ package main
 
 import (
 	"log"
-	"reminder-flow/internal/modules/subscription"
-	"reminder-flow/internal/scheduler"
-	"reminder-flow/internal/wechat"
 
 	"reminder-flow/internal/config"
 	"reminder-flow/internal/db"
@@ -28,24 +25,6 @@ func main() {
 
 	log.Printf("migrations executed successfully: %s", migrationDir)
 
-	subscriptionRepo := subscription.NewRepository(pool)
-
-	wechatMiniService := wechat.NewMiniService(
-		cfg.WechatMiniAppID,
-		cfg.WechatMiniAppSecret,
-	)
-
-	subscriptionService := subscription.NewService(
-		cfg,
-		subscriptionRepo,
-		wechatMiniService,
-	)
-
-	reminderScheduler := scheduler.NewReminderScheduler(pool, subscriptionService)
-	reminderScheduler.Start()
-
-	overdueScheduler := scheduler.NewOverdueScheduler(pool, subscriptionService)
-	overdueScheduler.Start()
 
 	r := router.NewRouter(pool, cfg)
 
