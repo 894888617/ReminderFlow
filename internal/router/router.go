@@ -8,9 +8,7 @@ import (
 	"reminder-flow/internal/modules/mobile"
 	"reminder-flow/internal/modules/notification"
 	"reminder-flow/internal/modules/record"
-	"reminder-flow/internal/modules/reminder"
 	"reminder-flow/internal/modules/subscription"
-	"reminder-flow/internal/modules/todo"
 	"reminder-flow/internal/modules/wechatmini"
 	"reminder-flow/internal/wechat"
 	"time"
@@ -71,14 +69,10 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	calendarRepo := calendar.NewRepository(db)
 	calendarHandler := calendar.NewHandler(calendarRepo)
 
-	reminderRepo := reminder.NewRepository(db)
-	reminderHandler := reminder.NewHandler(reminderRepo)
 
 	notificationRepo := notification.NewRepository(db)
 	notificationHandler := notification.NewHandler(notificationRepo)
 
-	todoRepo := todo.NewRepository(db)
-	todoHandler := todo.NewHandler(todoRepo)
 
 	wechatMiniRepo := wechatmini.NewRepository(db)
 	wechatMiniHandler := wechatmini.NewHandler(cfg, wechatMiniRepo)
@@ -156,10 +150,6 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.POST("/records", recordHandler.Create)
 			authGroup.GET("/records", recordHandler.List)
 
-			authGroup.GET("/records/overdue", recordHandler.ListOverdue)
-
-			authGroup.GET("/records/:id/logs", recordHandler.ListOperationLogs)
-
 			authGroup.PUT("/records/:id/assignee", recordHandler.TransferAssignee)
 
 			authGroup.GET("/records/:id", recordHandler.Detail)
@@ -167,16 +157,9 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.DELETE("/records/:id", recordHandler.Delete)
 			authGroup.PUT("/records/:id/status", recordHandler.UpdateStatus)
 
-			authGroup.POST("/records/:id/reminders", reminderHandler.Create)
-			authGroup.GET("/records/:id/reminders", reminderHandler.ListByRecord)
-			authGroup.GET("/reminders/today", reminderHandler.ListToday)
-			authGroup.GET("/reminders/upcoming", reminderHandler.ListUpcoming)
-
 			authGroup.GET("/notifications", notificationHandler.List)
 			authGroup.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
 			authGroup.DELETE("/notifications/:id", notificationHandler.Delete)
-
-			authGroup.GET("/todos/today", todoHandler.Today)
 
 			authGroup.GET("/mobile/home", mobileHandler.Home)
 		}

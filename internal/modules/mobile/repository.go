@@ -37,9 +37,7 @@ type RecentRecord struct {
 
 type HomeSummary struct {
 	TodayDueCount           int64                `json:"today_due_count"`
-	TodayReminderCount      int64                `json:"today_reminder_count"`
 	UnfinishedCount         int64                `json:"unfinished_count"`
-	OverdueCount            int64                `json:"overdue_count"`
 	UnreadNotificationCount int64                `json:"unread_notification_count"`
 	RecentNotifications     []RecentNotification `json:"recent_notifications"`
 	RecentRecords           []RecentRecord       `json:"recent_records"`
@@ -70,20 +68,6 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 
 	if err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*)
-		FROM reminders rem
-		INNER JOIN records rec ON rec.id = rem.record_id
-		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
-		WHERE cm.user_id = $1
-		  AND cm.status = 'active'
-		  AND rec.assignee_id = $1
-		  AND rem.remind_at >= $2
-		  AND rem.remind_at < $3
-	`, userID, todayStart, tomorrowStart).Scan(&result.TodayReminderCount); err != nil {
-		return nil, err
-	}
-
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*)
 		FROM records rec
 		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
 		WHERE cm.user_id = $1
@@ -91,20 +75,6 @@ func (r *Repository) GetHomeSummary(ctx context.Context, userID int64) (*HomeSum
 		  AND rec.assignee_id = $1
 		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
 	`, userID).Scan(&result.UnfinishedCount); err != nil {
-		return nil, err
-	}
-
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*)
-		FROM records rec
-		INNER JOIN calendar_members cm ON cm.calendar_id = rec.calendar_id
-		WHERE cm.user_id = $1
-		  AND cm.status = 'active'
-		  AND rec.assignee_id = $1
-		  AND rec.due_at IS NOT NULL
-		  AND rec.due_at < NOW()
-		  AND rec.status NOT IN ('COMPLETED', 'DONE', 'CANCELLED')
-	`, userID).Scan(&result.OverdueCount); err != nil {
 		return nil, err
 	}
 

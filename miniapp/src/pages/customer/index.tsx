@@ -6,7 +6,7 @@ import './select.scss'
 
 export default function CustomerPage() {
   const r = useRouter()
-  const cid = Number(r.params.calendar_id || 0)
+  const cid = Number(r.params.calendar_id || Taro.getStorageSync('current_calendar_id') || 0)
   const [k, setK] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(false)
