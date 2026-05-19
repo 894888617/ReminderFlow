@@ -36,8 +36,12 @@ type Record struct {
 	DueAt           *time.Time `json:"due_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	CustomerID      *int64     `json:"customer_id"`
 	CustomerName    string     `json:"customer_name"`
 	CustomerPhone   string     `json:"customer_phone"`
+	CustomerRemark  string     `json:"customer_remark"`
+	ProjectID       *int64     `json:"project_id"`
+	ProjectName     string     `json:"project_name"`
 	ServiceName     string     `json:"service_name"`
 	CalendarStartAt *time.Time `json:"calendar_start_at"`
 	CalendarEndAt   *time.Time `json:"calendar_end_at"`
@@ -58,8 +62,12 @@ type CreateRecordParams struct {
 	CalendarAllDay    bool
 	RemindAt          *time.Time
 	AppointmentStatus string
+	CustomerID        *int64
 	CustomerName      string
 	CustomerPhone     string
+	CustomerRemark    string
+	ProjectID         *int64
+	ProjectName       string
 	ServiceName       string
 }
 
@@ -127,11 +135,15 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			assignee_id,
 			status,
 			due_at,
+			customer_id,
 			customer_name,
 			customer_phone,
+			customer_remark,
+			project_id,
+			project_name,
 			service_name
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING',  $7, $8, $9, $10, $11, $12, $13)
 		RETURNING
 			id,
 			COALESCE(workspace_id, calendar_id, 0),
@@ -142,8 +154,12 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			assignee_id,
 			status,
 			due_at,
+			customer_id,
 			COALESCE(customer_name, ''),
 			COALESCE(customer_phone, ''),
+			COALESCE(customer_remark, ''),
+			project_id,
+			COALESCE(project_name, ''),
 			COALESCE(service_name, ''),
 			created_at,
 			updated_at
@@ -155,8 +171,12 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.CreatorID,
 		params.AssigneeID,
 		params.DueAt,
+		params.CustomerID,
 		strings.TrimSpace(params.CustomerName),
 		strings.TrimSpace(params.CustomerPhone),
+		strings.TrimSpace(params.CustomerRemark),
+		params.ProjectID,
+		strings.TrimSpace(params.ProjectName),
 		strings.TrimSpace(params.ServiceName),
 	).Scan(
 		&rec.ID,
@@ -168,8 +188,12 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		&rec.AssigneeID,
 		&rec.Status,
 		&rec.DueAt,
+		&rec.CustomerID,
 		&rec.CustomerName,
 		&rec.CustomerPhone,
+		&rec.CustomerRemark,
+		&rec.ProjectID,
+		&rec.ProjectName,
 		&rec.ServiceName,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
@@ -533,8 +557,12 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 		&rec.AssigneeName,
 		&rec.Status,
 		&rec.DueAt,
+		&rec.CustomerID,
 		&rec.CustomerName,
 		&rec.CustomerPhone,
+		&rec.CustomerRemark,
+		&rec.ProjectID,
+		&rec.ProjectName,
 		&rec.ServiceName,
 		&rec.CalendarStartAt,
 		&rec.CalendarEndAt,

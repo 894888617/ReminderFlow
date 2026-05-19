@@ -43,8 +43,13 @@ type CreateRecordRequest struct {
 	CalendarEndAt     *string `json:"calendar_end_at"`
 	CalendarAllDay    *bool   `json:"calendar_all_day"`
 	AppointmentStatus string  `json:"appointment_status"`
+	CustomerID        *int64  `json:"customer_id"`
 	CustomerName      string  `json:"customer_name"`
 	CustomerPhone     string  `json:"customer_phone"`
+	CustomerRemark    string  `json:"customer_remark"`
+	ProjectID         *int64  `json:"project_id"`
+	ProjectName       string  `json:"project_name"`
+	SaveToCustomer    *bool   `json:"save_to_customer"`
 	ServiceName       string  `json:"service_name"`
 }
 
@@ -146,8 +151,12 @@ func (h *Handler) Create(c *gin.Context) {
 		CalendarAllDay:    calendarAllDay,
 		RemindAt:          remindAt,
 		AppointmentStatus: strings.ToLower(NormalizeRecordStatus(req.AppointmentStatus)),
+		CustomerID:        req.CustomerID,
 		CustomerName:      req.CustomerName,
 		CustomerPhone:     req.CustomerPhone,
+		CustomerRemark:    req.CustomerRemark,
+		ProjectID:         req.ProjectID,
+		ProjectName:       req.ProjectName,
 		ServiceName:       req.ServiceName,
 	})
 
@@ -300,8 +309,12 @@ type UpdateRecordRequest struct {
 	CalendarStartAt string  `json:"calendar_start_at"`
 	CalendarEndAt   *string `json:"calendar_end_at"`
 	CalendarAllDay  *bool   `json:"calendar_all_day"`
+	CustomerID      *int64  `json:"customer_id"`
 	CustomerName    string  `json:"customer_name"`
 	CustomerPhone   string  `json:"customer_phone"`
+	CustomerRemark  string  `json:"customer_remark"`
+	ProjectID       *int64  `json:"project_id"`
+	ProjectName     string  `json:"project_name"`
 	ServiceName     string  `json:"service_name"`
 }
 
@@ -496,8 +509,12 @@ func (h *Handler) Update(c *gin.Context) {
 		CalendarAllDay:   calendarAllDay,
 		Status:           oldRec.Status,
 		UpdateCalendarAt: updateCalendarAt,
+		CustomerID:       req.CustomerID,
 		CustomerName:     req.CustomerName,
 		CustomerPhone:    req.CustomerPhone,
+		CustomerRemark:   req.CustomerRemark,
+		ProjectID:        req.ProjectID,
+		ProjectName:      req.ProjectName,
 		ServiceName:      req.ServiceName,
 	})
 

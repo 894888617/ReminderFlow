@@ -1,4 +1,4 @@
-import { View, Text, Input, Textarea, Picker } from "@tarojs/components";
+import { View, Text, Input, Textarea, Picker, Checkbox, CheckboxGroup } from "@tarojs/components";
 import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 
@@ -62,6 +62,9 @@ export default function RecordCreatePage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
+  const [customerRemark, setCustomerRemark] = useState("");
+  const [customerId, setCustomerId] = useState<number | undefined>();
+  const [saveToCustomer, setSaveToCustomer] = useState(true);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(defaultAppointmentDate);
@@ -265,8 +268,11 @@ export default function RecordCreatePage() {
         calendar_start_at: calendarStartAt,
         calendar_all_day: calendarAllDay,
         appointment_status: statusOptions[statusIndex].value,
+        customer_id: customerId,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
+        customer_remark: customerRemark.trim(),
+        save_to_customer: saveToCustomer,
         service_name: serviceName.trim(),
       });
 
@@ -348,6 +354,24 @@ export default function RecordCreatePage() {
           )}
         </View>
 
+
+        <View className="form-item">
+          <Text className="form-label">客户信息</Text>
+          <View className="clear-time" onClick={() => {
+            if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
+            const url = `/pages/customer/select?calendar_id=${calendarId}`
+            const eventChannel = Taro.navigateTo({ url } as any)
+            Promise.resolve(eventChannel).then((res: any) => {
+              res?.eventChannel?.on?.('customerSelected', (payload: any) => {
+                setCustomerId(Number(payload?.customer_id || 0) || undefined)
+                setCustomerName(payload?.customer_name || '')
+                setCustomerPhone(payload?.customer_phone || '')
+                setCustomerRemark(payload?.customer_remark || '')
+              })
+            })
+          }}>选择已有客户</View>
+        </View>
+
         <View className="form-item">
           <Text className="form-label">客户姓名</Text>
           <Input
@@ -369,6 +393,13 @@ export default function RecordCreatePage() {
             onInput={(e) => setCustomerPhone(e.detail.value)}
           />
         </View>
+
+        <View className="form-item">
+          <Text className="form-label">客户备注</Text>
+          <Input className="form-input" value={customerRemark} maxlength={255} onInput={(e) => setCustomerRemark(e.detail.value)} />
+        </View>
+
+        {customerId ? null : <View className="form-item"><CheckboxGroup onChange={(e)=>setSaveToCustomer((e.detail.value||[]).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
 
         <View className="form-item">
           <Text className="form-label">服务项目</Text>
