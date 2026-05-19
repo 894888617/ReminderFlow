@@ -34,7 +34,7 @@ func (r *Repository) List(ctx context.Context, calendarID int64, keyword string)
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Customer
+	out := make([]Customer, 0)
 	for rows.Next() {
 		var c Customer
 		if err := rows.Scan(&c.ID, &c.CalendarID, &c.Name, &c.Phone, &c.Remark, &c.UpdatedAt); err != nil {
