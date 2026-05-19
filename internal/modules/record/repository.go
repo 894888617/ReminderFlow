@@ -52,7 +52,6 @@ type Record struct {
 }
 
 type CreateRecordParams struct {
-	WorkspaceID       int64
 	CalendarID        int64
 	Title             string
 	Content           string
@@ -62,7 +61,6 @@ type CreateRecordParams struct {
 	CalendarStartAt   *time.Time
 	CalendarEndAt     *time.Time
 	CalendarAllDay    bool
-	RemindAt          *time.Time
 	AppointmentStatus string
 	CustomerID        *int64
 	CustomerName      string
@@ -104,13 +102,7 @@ func (r *Repository) IsCalendarMember(ctx context.Context, calendarID, userID in
 }
 
 func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Record, error) {
-	if params.CalendarID <= 0 {
-		params.CalendarID = params.WorkspaceID
-	}
 	var legacyWorkspaceID *int64
-	if params.WorkspaceID > 0 {
-		legacyWorkspaceID = &params.WorkspaceID
-	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -239,22 +231,6 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	if params.RemindAt != nil {
-		_, err = tx.Exec(ctx, `
-			INSERT INTO reminders (
-				calendar_id,
-				record_id,
-				remind_at,
-				repeat_type,
-				notified
-			)
-			VALUES ($1, $2, $3, 'NONE', false)
-		`, params.CalendarID, rec.ID, params.RemindAt)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	if params.CalendarStartAt != nil {
@@ -802,16 +778,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. 删除提醒
-	_, err = tx.Exec(ctx, `
-		DELETE FROM reminders
-		WHERE record_id = $1
-	`, id)
-	if err != nil {
-		return err
-	}
-
-	// 2. 删除或解绑通知
+	// 1. 删除或解绑通知
 	// 如果你希望通知也删除，用 DELETE
 	_, err = tx.Exec(ctx, `
 		DELETE FROM notifications
@@ -821,7 +788,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	// 3. 操作日志不建议删除，改成 record_id = NULL
+	// 2. 操作日志不建议删除，改成 record_id = NULL
 	// 这样可以保留历史日志，不阻塞 records 删除
 	_, err = tx.Exec(ctx, `
 		UPDATE operation_logs
@@ -832,7 +799,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	// 4. 最后删除记录
+	// 3. 最后删除记录
 	_, err = tx.Exec(ctx, `
 		DELETE FROM records
 		WHERE id = $1
@@ -881,81 +848,6 @@ func (r *Repository) UpdateStatus(ctx context.Context, id int64, status string) 
 	return r.FindByID(ctx, recordID)
 }
 
-func (r *Repository) ListOverdue(ctx context.Context, userID int64) ([]Record, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT
-			rec.id,
-			COALESCE(rec.workspace_id, rec.calendar_id, 0),
-			COALESCE(rec.calendar_id, 0),
-			rec.title,
-			COALESCE(rec.content, ''),
-			rec.creator_id,
-			rec.assignee_id,
-			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
-			rec.status,
-			rec.due_at,
-			COALESCE(rec.customer_name, ''),
-			COALESCE(rec.customer_phone, ''),
-			COALESCE(rec.service_name, ''),
-			ce.start_at,
-			ce.end_at,
-			ce.all_day,
-			rec.created_at,
-			rec.updated_at
-		FROM records rec
-		INNER JOIN calendar_members wm ON wm.calendar_id = rec.calendar_id
-		LEFT JOIN users u ON u.id = rec.assignee_id
-		WHERE wm.status = 'active'
-		  AND wm.user_id = $1
-		  AND rec.assignee_id = $1
-		  AND FALSE
-		ORDER BY rec.due_at ASC, rec.created_at DESC
-		LIMIT 100
-	`, userID)
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	list := make([]Record, 0)
-
-	for rows.Next() {
-		var rec Record
-
-		if err := rows.Scan(
-			&rec.ID,
-			&rec.WorkspaceID,
-			&rec.CalendarID,
-			&rec.Title,
-			&rec.Content,
-			&rec.CreatorID,
-			&rec.AssigneeID,
-			&rec.AssigneeName,
-			&rec.Status,
-			&rec.DueAt,
-			&rec.CustomerName,
-			&rec.CustomerPhone,
-			&rec.ServiceName,
-			&rec.CalendarStartAt,
-			&rec.CalendarEndAt,
-			&rec.CalendarAllDay,
-			&rec.CreatedAt,
-			&rec.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-
-		list = append(list, rec)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
 type CreateOperationLogParams struct {
 	CalendarID int64
 	RecordID   *int64
@@ -984,68 +876,6 @@ func (r *Repository) CreateOperationLog(ctx context.Context, params CreateOperat
 	)
 
 	return err
-}
-
-type OperationLog struct {
-	ID         int64     `json:"id"`
-	CalendarID int64     `json:"calendar_id"`
-	RecordID   *int64    `json:"record_id"`
-	UserID     *int64    `json:"user_id"`
-	Username   string    `json:"username"`
-	Action     string    `json:"action"`
-	Detail     string    `json:"detail"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-func (r *Repository) ListOperationLogsByRecordID(ctx context.Context, recordID int64) ([]OperationLog, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT
-			ol.id,
-			ol.calendar_id,
-			ol.record_id,
-			ol.user_id,
-			COALESCE(NULLIF(u.nickname, ''), u.username, ''),
-			ol.action,
-			COALESCE(ol.detail, ''),
-			ol.created_at
-		FROM operation_logs ol
-		LEFT JOIN users u ON u.id = ol.user_id
-		WHERE ol.record_id = $1
-		ORDER BY ol.created_at DESC
-		LIMIT 100
-	`, recordID)
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	list := make([]OperationLog, 0)
-
-	for rows.Next() {
-		var item OperationLog
-
-		if err := rows.Scan(
-			&item.ID,
-			&item.CalendarID,
-			&item.RecordID,
-			&item.UserID,
-			&item.Username,
-			&item.Action,
-			&item.Detail,
-			&item.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-
-		list = append(list, item)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return list, nil
 }
 
 func (r *Repository) UpdateAssignee(ctx context.Context, recordID int64, assigneeID int64) (*Record, error) {
