@@ -3,7 +3,7 @@ import { request } from "./request";
 
 export interface RecordItem {
   id: number;
-  workspace_id: number;
+  workspace_id?: number;
   calendar_id?: number;
   title: string;
   content?: string;
@@ -36,7 +36,7 @@ export interface PageResult<T> {
 }
 
 export interface RecordQueryParams {
-  workspace_id: number;
+  calendar_id: number;
   page?: number;
   page_size?: number;
   status?: RecordStatus | "";
@@ -80,8 +80,8 @@ export function getRecords(params: RecordQueryParams) {
 }
 
 export interface CreateRecordParams {
-  workspace_id: number;
-  calendar_id?: number;
+  calendar_id: number;
+  workspace_id?: number;
   title: string;
   content?: string;
   assignee_id?: number;
@@ -110,17 +110,6 @@ export function createRecord(data: CreateRecordParams) {
   }).then(normalizeRecordItem);
 }
 
-export interface OperationLog {
-  id: number;
-  workspace_id?: number | null;
-  record_id?: number | null;
-  user_id?: number | null;
-  username: string;
-  action: string;
-  detail: string;
-  created_at: string;
-}
-
 export function getRecordDetail(id: number) {
   return request<RecordItem>({
     url: `/api/records/${id}`,
@@ -138,12 +127,6 @@ export function updateRecordStatus(id: number, status: RecordStatus) {
   }).then(normalizeRecordItem);
 }
 
-export function getRecordLogs(id: number) {
-  return request<OperationLog[]>({
-    url: `/api/records/${id}/logs`,
-    method: "GET",
-  });
-}
 
 export interface UpdateRecordParams {
   title: string;

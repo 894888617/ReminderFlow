@@ -162,7 +162,7 @@ export default function LoginPage() {
         <Text className='login-title'>轻记协同</Text>
 
         <Text className='login-desc'>
-          协同记录、定时提醒、状态跟踪，适合个人和小团队使用。
+          协同记录与日历预约管理，适合个人和小团队使用。
         </Text>
 
         <View className='profile-form'>
@@ -196,7 +196,7 @@ export default function LoginPage() {
         </Button>
 
         <Text className='login-tip'>
-          登录后即可创建日历、记录任务并设置提醒。
+          登录后即可创建日历并管理预约记录。
         </Text>
       </View>
     </View>

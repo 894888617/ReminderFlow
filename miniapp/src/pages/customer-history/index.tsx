@@ -31,7 +31,7 @@ export default function CustomerHistoryPage() {
   const customerPhone = String(router.params.customer_phone || "");
   const customerName = String(router.params.customer_name || "");
   const calendarId = Number(
-    router.params.calendar_id || router.params.workspace_id || 0,
+    router.params.calendar_id || Taro.getStorageSync("current_calendar_id") || 0,
   );
   const [items, setItems] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ export default function CustomerHistoryPage() {
     try {
       setLoading(true);
       const data = await getRecords({
-        workspace_id: calendarId,
+        calendar_id: calendarId,
         keyword: keyword || undefined,
         customer_phone: customerPhone || undefined,
         customer_name: customerName || undefined,

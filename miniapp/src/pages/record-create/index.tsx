@@ -47,7 +47,7 @@ export default function RecordCreatePage() {
   const router = useRouter();
 
   const routeCalendarId = Number(
-    router.params.calendar_id || router.params.workspace_id || 0,
+    router.params.calendar_id || 0,
   );
   const selectedDate = String(router.params.selected_date || "");
   const currentDate = String(router.params.current_date || selectedDate || "");
@@ -244,7 +244,6 @@ export default function RecordCreatePage() {
     const calendarAllDay = !finalStartTime;
 
     const buildPayload = (overrides?: Partial<any>) => ({
-      workspace_id: calendarId,
       calendar_id: calendarId,
       title: finalTitle,
       content: [
