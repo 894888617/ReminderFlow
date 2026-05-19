@@ -23,8 +23,10 @@ export default function CustomerPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const data = await listCustomers(cid, k)
-      setCustomers(Array.isArray(data) ? data : [])
+      const res = await listCustomers(cid, k)
+      const raw = (res as any)?.data?.data || (res as any)?.data?.list || (res as any)?.data?.items || res
+      const list = Array.isArray(raw) ? raw : []
+      setCustomers(list)
     } catch (err) {
       console.error(err)
       setCustomers([])
@@ -55,7 +57,7 @@ export default function CustomerPage() {
       {!cid ? <Text className='empty'>请先选择日历空间</Text> : null}
       {cid && loading ? <Text className='empty'>客户加载中...</Text> : null}
       {cid && !loading && !!loadError ? <Text className='empty'>{loadError}</Text> : null}
-      {cid && !loading && !loadError && filteredCustomers.length === 0 ? <Text className='empty'>暂无客户档案，新增后创建预约可快速填写客户信息</Text> : null}
+      {cid && !loading && !loadError && !filteredCustomers[0] ? <Text className='empty'>暂无客户档案，新增后创建预约可快速填写客户信息</Text> : null}
       {cid && !loading && !loadError && filteredCustomers.map((i) => (
         <View key={i.id} className='item'>
           <Text>{i.name || '-'}</Text>

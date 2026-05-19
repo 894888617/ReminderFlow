@@ -228,8 +228,8 @@ export default function CalendarPage() {
   const routeCalendarId = Number(
     router.params.calendar_id || router.params.id || 0,
   );
-  const routeSelectedDate = router.params.selected_date
-    ? String(router.params.selected_date)
+  const routeSelectedDate = (router.params.date || router.params.selected_date)
+    ? String(router.params.date || router.params.selected_date)
     : "";
   const today = useMemo(() => new Date(), []);
   const todayText = useMemo(() => formatDate(today), [today]);
