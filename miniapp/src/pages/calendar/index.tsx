@@ -205,9 +205,9 @@ function getEventTime(event: CalendarEvent) {
 
 function getEventTitle(event: CalendarEvent) {
   const status = getEventStatus(event);
-  if (status === "blocked") return "不接";
-  if (status === "rest") return "休息";
-  if (status === "full") return "已满";
+  if (status === "blocked") return event.assignee_name + "不接";
+  if (status === "rest") return event.assignee_name + "休息";
+  if (status === "full") return event.assignee_name + "已满";
   return event.record_title || event.title || "未命名日程";
 }
 
