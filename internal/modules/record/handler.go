@@ -447,8 +447,17 @@ func (h *Handler) Update(c *gin.Context) {
 
 	oldRec, err := h.repo.FindByID(c.Request.Context(), recordID)
 	if err != nil {
-		response.NotFound(c, "record not found")
-		return
+		resolvedRecordID, resolveErr := h.repo.ResolveRecordIDByCalendarEventID(c.Request.Context(), recordID)
+		if resolveErr != nil {
+			response.NotFound(c, "record not found")
+			return
+		}
+		recordID = resolvedRecordID
+		oldRec, err = h.repo.FindByID(c.Request.Context(), recordID)
+		if err != nil {
+			response.NotFound(c, "record not found")
+			return
+		}
 	}
 
 	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), oldRec.CalendarID, currentUserID)
@@ -648,8 +657,17 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 	oldRec, err := h.repo.FindByID(c.Request.Context(), recordID)
 	if err != nil {
-		response.NotFound(c, "record not found")
-		return
+		resolvedRecordID, resolveErr := h.repo.ResolveRecordIDByCalendarEventID(c.Request.Context(), recordID)
+		if resolveErr != nil {
+			response.NotFound(c, "record not found")
+			return
+		}
+		recordID = resolvedRecordID
+		oldRec, err = h.repo.FindByID(c.Request.Context(), recordID)
+		if err != nil {
+			response.NotFound(c, "record not found")
+			return
+		}
 	}
 
 	currentRole, err := h.repo.GetCalendarMemberRole(c.Request.Context(), oldRec.CalendarID, currentUserID)
