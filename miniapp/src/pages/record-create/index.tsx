@@ -286,7 +286,11 @@ export default function RecordCreatePage() {
         console.log('create record payload', payload);
       }
 
-      await createRecord(payload);
+      const created = await createRecord(payload);
+      const newRecordId = Number(created?.id || 0);
+      if (!newRecordId) {
+        throw new Error('invalid record id');
+      }
 
       Taro.showToast({
         title: "创建成功",
@@ -302,7 +306,7 @@ export default function RecordCreatePage() {
       });
 
       setTimeout(() => {
-        returnToCalendar();
+        Taro.redirectTo({ url: `/pages/record-detail/index?id=${newRecordId}` });
       }, 500);
     } catch (err: any) {
       console.error(err);
@@ -316,34 +320,58 @@ export default function RecordCreatePage() {
         Taro.hideLoading();
         const customer = err?.customer || {};
         const modal = await Taro.showModal({ title: '手机号重复', content: '该手机号客户已存在，是否使用已有客户信息？', confirmText: '使用已有客户', cancelText: '不使用' });
-        if (modal.confirm) {
-          const existingCustomerId = Number(customer.id || 0) || undefined;
-          setCustomerId(existingCustomerId);
-          setCustomerName(customer.name || customerName);
-          setCustomerPhone(customer.phone || customerPhone);
-          setCustomerRemark(customer.remark || customerRemark);
-          setSaveToCustomer(false);
-          Taro.showLoading({ title: "保存中...", mask: true });
-          await createRecord(buildPayload({
+        if (!modal.confirm && !modal.cancel) {
+          return;
+        }
+
+        const useExisting = !!modal.confirm;
+        const existingCustomerId = Number(customer.id || 0) || undefined;
+        const retryPayload = useExisting
+          ? buildPayload({
             customer_id: existingCustomerId ?? null,
             customer_name: customer.name || customerName.trim(),
             customer_phone: customer.phone || customerPhone.trim(),
             customer_remark: customer.remark || customerRemark.trim(),
             save_customer_to_library: false,
-          }));
-          Taro.showToast({ title: "创建成功", icon: "success" });
-          return;
-        } else {
-          setCustomerId(undefined);
-          setSaveToCustomer(false);
-          Taro.showLoading({ title: "保存中...", mask: true });
-          await createRecord(buildPayload({
+          })
+          : buildPayload({
             customer_id: null,
             save_customer_to_library: false,
-          }));
-          Taro.showToast({ title: "创建成功", icon: "success" });
-          return;
+          });
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('create record payload', retryPayload);
         }
+
+        Taro.showLoading({ title: "保存中...", mask: true });
+        const created = await createRecord(retryPayload);
+        const newRecordId = Number(created?.id || 0);
+        if (!newRecordId) {
+          throw new Error('invalid record id');
+        }
+
+        if (useExisting) {
+          setCustomerId(existingCustomerId);
+          setCustomerName(customer.name || customerName);
+          setCustomerPhone(customer.phone || customerPhone);
+          setCustomerRemark(customer.remark || customerRemark);
+        } else {
+          setCustomerId(undefined);
+        }
+        setSaveToCustomer(false);
+
+        Taro.showToast({ title: "创建成功", icon: "success" });
+        saveCalendarReturnContext({
+          currentCalendarId: calendarId,
+          current_calendar_id: calendarId,
+          calendar_id: calendarId,
+          current_date: currentDate || finalAppointmentDate,
+          selected_date: finalAppointmentDate,
+        });
+        setTimeout(() => {
+          Taro.redirectTo({ url: `/pages/record-detail/index?id=${newRecordId}` });
+        }, 500);
+        return;
       } else {
         Taro.showToast({ title: '创建预约失败，请稍后重试', icon: 'none' });
       }

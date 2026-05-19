@@ -51,7 +51,7 @@ export default function CalendarMembersPage() {
   const router = useRouter()
   const calendarId = Number(router.params.calendar_id || router.params.id || 0)
 
-  const [calendarName, setCalendarName] = useState('')
+  const [setCalendarName] = useState('')
   const [currentRole, setCurrentRole] = useState('')
   const [members, setMembers] = useState<CalendarMember[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,6 +79,7 @@ export default function CalendarMembersPage() {
     try {
       setLoading(true)
       const detail = await getCalendarDetail(calendarId)
+      // @ts-ignore
       setCalendarName(detail.name)
       setCurrentRole(normalizeCalendarRole(detail))
 

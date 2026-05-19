@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 
 	"reminder-flow/internal/middleware"
 	"reminder-flow/pkg/response"
@@ -446,6 +447,10 @@ func (h *Handler) Detail(c *gin.Context) {
 
 	record, err := h.repo.GetDetailWithRole(c.Request.Context(), recordID, currentUserID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.NotFound(c, "record not found")
+			return
+		}
 		response.Internal(c, "get record detail failed")
 		return
 	}
