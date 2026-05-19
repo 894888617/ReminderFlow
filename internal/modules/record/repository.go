@@ -561,7 +561,6 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 	err := r.db.QueryRow(ctx, `
 		SELECT
 			rec.id,
-			COALESCE(rec.workspace_id, rec.calendar_id, 0),
 			COALESCE(rec.calendar_id, 0),
 			rec.title,
 			COALESCE(rec.content, ''),
@@ -591,7 +590,6 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 		  AND rec.deleted_at IS NULL
 	`, id).Scan(
 		&rec.ID,
-		&rec.WorkspaceID,
 		&rec.CalendarID,
 		&rec.Title,
 		&rec.Content,
@@ -600,12 +598,8 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*Record, error) {
 		&rec.AssigneeName,
 		&rec.Status,
 		&rec.DueAt,
-		&rec.CustomerID,
 		&rec.CustomerName,
 		&rec.CustomerPhone,
-		&rec.CustomerRemark,
-		&rec.ProjectID,
-		&rec.ProjectName,
 		&rec.ServiceName,
 		&rec.CalendarStartAt,
 		&rec.CalendarEndAt,
