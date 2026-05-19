@@ -101,6 +101,21 @@ func (r *Repository) IsCalendarMember(ctx context.Context, calendarID, userID in
 	return exists, err
 }
 
+func (r *Repository) ResolveRecordIDByCalendarEventID(ctx context.Context, eventID int64) (int64, error) {
+	var recordID int64
+	err := r.db.QueryRow(ctx, `
+		SELECT record_id
+		FROM calendar_events
+		WHERE id = $1
+		  AND deleted_at IS NULL
+		  AND record_id IS NOT NULL
+	`, eventID).Scan(&recordID)
+	if err != nil {
+		return 0, err
+	}
+	return recordID, nil
+}
+
 func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Record, error) {
 	var legacyWorkspaceID *int64
 
@@ -386,7 +401,10 @@ func (r *Repository) ListByCalendar(ctx context.Context, params ListRecordsParam
 	}
 
 	if params.CustomerPhone != "" {
-		whereParts = append(whereParts, fmt.Sprintf("rec.customer_phone = $%d", argIndex))
+		whereParts = append(
+			whereParts,
+			fmt.Sprintf("REGEXP_REPLACE(COALESCE(rec.customer_phone, ''), '[^0-9]', '', 'g') = REGEXP_REPLACE($%d, '[^0-9]', '', 'g')", argIndex),
+		)
 		args = append(args, params.CustomerPhone)
 		argIndex++
 	} else if params.CustomerName != "" {
