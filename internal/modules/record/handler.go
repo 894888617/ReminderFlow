@@ -138,6 +138,31 @@ func (h *Handler) Create(c *gin.Context) {
 		calendarAllDay = *req.CalendarAllDay
 	}
 
+	requestSaveToCustomer := req.SaveToCustomer != nil && *req.SaveToCustomer
+	if req.CustomerID != nil {
+		requestSaveToCustomer = false
+	}
+
+	if req.CustomerID == nil && requestSaveToCustomer {
+		phone := strings.TrimSpace(req.CustomerPhone)
+		if phone != "" {
+			existing, findErr := h.repo.FindCustomerByPhone(c.Request.Context(), calendarID, phone)
+			if findErr == nil && existing != nil {
+				c.JSON(409, gin.H{"code": "CUSTOMER_PHONE_EXISTS", "message": "该手机号客户已存在", "customer": gin.H{"id": existing.ID, "name": existing.Name, "phone": existing.Phone, "remark": existing.Remark}})
+				return
+			}
+		}
+		createdCustomer, createCustomerErr := h.repo.CreateCustomer(c.Request.Context(), calendarID, req.CustomerName, req.CustomerPhone, req.CustomerRemark, currentUserID)
+		if createCustomerErr == nil && createdCustomer != nil {
+			req.CustomerID = &createdCustomer.ID
+			req.CustomerName = createdCustomer.Name
+			req.CustomerPhone = createdCustomer.Phone
+			req.CustomerRemark = createdCustomer.Remark
+		} else if createCustomerErr != nil {
+			log.Printf("[record.create] create customer failed: calendar_id=%d user_id=%d err=%v", calendarID, currentUserID, createCustomerErr)
+		}
+	}
+
 	rec, err := h.repo.Create(c.Request.Context(), CreateRecordParams{
 		WorkspaceID:       0,
 		CalendarID:        calendarID,
@@ -165,7 +190,9 @@ func (h *Handler) Create(c *gin.Context) {
 			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "message": "该负责人该时间段已有安排", "msg": "该负责人该时间段已有安排"})
 			return
 		}
-		response.Internal(c, "create record failed")
+		log.Printf("[record.create] failed: user_id=%d calendar_id=%d body=%+v err=%v", currentUserID, calendarID, req, err)
+		log.Printf("[record.create] stack trace: %+v", err)
+		response.Internal(c, "create_record_failed")
 		return
 	}
 

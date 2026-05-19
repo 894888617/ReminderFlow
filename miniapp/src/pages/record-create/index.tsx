@@ -251,7 +251,7 @@ export default function RecordCreatePage() {
         mask: true,
       });
 
-      await createRecord({
+      const payload = {
         workspace_id: calendarId,
         calendar_id: calendarId,
         title: finalTitle,
@@ -272,11 +272,15 @@ export default function RecordCreatePage() {
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
         customer_remark: customerRemark.trim(),
-        save_to_customer: saveToCustomer,
+        save_to_customer: customerId ? false : saveToCustomer,
         service_name: serviceName.trim(),
-      });
+      };
 
-      Taro.hideLoading();
+      if (process.env.NODE_ENV === 'development') {
+        console.log('create record payload', payload);
+      }
+
+      await createRecord(payload);
 
       Taro.showToast({
         title: "创建成功",
@@ -296,15 +300,31 @@ export default function RecordCreatePage() {
       }, 500);
     } catch (err: any) {
       console.error(err);
-      Taro.hideLoading();
 
       if (err?.code === "SCHEDULE_CONFLICT") {
         Taro.showToast({
           title: "该时间段已有安排，请调整时间",
           icon: "none",
         });
+      } else if (err?.code === 'CUSTOMER_PHONE_EXISTS') {
+        const customer = err?.customer || {};
+        const modal = await Taro.showModal({ title: '手机号重复', content: '该手机号客户已存在，是否使用已有客户信息？', confirmText: '使用已有', cancelText: '不使用' });
+        if (modal.confirm) {
+          setCustomerId(Number(customer.id || 0) || undefined);
+          setCustomerName(customer.name || customerName);
+          setCustomerPhone(customer.phone || customerPhone);
+          setCustomerRemark(customer.remark || customerRemark);
+          setSaveToCustomer(false);
+        } else {
+          setCustomerId(undefined);
+          setSaveToCustomer(false);
+          Taro.showToast({ title: '已改为不入客户库，请再次提交', icon: 'none' });
+        }
+      } else {
+        Taro.showToast({ title: '创建预约失败，请稍后重试', icon: 'none' });
       }
     } finally {
+      Taro.hideLoading();
       setSubmitting(false);
     }
   };
@@ -367,6 +387,7 @@ export default function RecordCreatePage() {
                 setCustomerName(payload?.customer_name || '')
                 setCustomerPhone(payload?.customer_phone || '')
                 setCustomerRemark(payload?.customer_remark || '')
+                setSaveToCustomer(false)
               })
             })
           }}>选择已有客户</View>

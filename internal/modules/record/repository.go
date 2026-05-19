@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrScheduleConflict = errors.New("schedule conflict")
+var ErrCustomerPhoneExists = errors.New("customer phone exists")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -120,6 +122,43 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.AppointmentStatus = "pending"
 	}
 
+	params.CustomerName = strings.TrimSpace(params.CustomerName)
+	params.CustomerPhone = strings.TrimSpace(params.CustomerPhone)
+	params.CustomerRemark = strings.TrimSpace(params.CustomerRemark)
+	params.ProjectName = strings.TrimSpace(params.ProjectName)
+	params.ServiceName = strings.TrimSpace(params.ServiceName)
+
+	if params.CustomerID != nil {
+		var existingCalendarID int64
+		var name, phone, remark string
+		err = tx.QueryRow(ctx, `
+			SELECT calendar_id, COALESCE(name,''), COALESCE(phone,''), COALESCE(remark,'')
+			FROM customers
+			WHERE id = $1 AND deleted_at IS NULL
+		`, *params.CustomerID).Scan(&existingCalendarID, &name, &phone, &remark)
+		if err != nil {
+			return nil, err
+		}
+		if existingCalendarID != params.CalendarID {
+			return nil, fmt.Errorf("customer %d does not belong to calendar %d", *params.CustomerID, params.CalendarID)
+		}
+		if params.CustomerName == "" {
+			params.CustomerName = name
+		}
+		if params.CustomerPhone == "" {
+			params.CustomerPhone = phone
+		}
+		if params.CustomerRemark == "" {
+			params.CustomerRemark = remark
+		}
+	}
+
+	if params.ProjectName != "" {
+		if err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, params.ProjectName, params.CreatorID); err != nil {
+			log.Printf("[record.create] upsert appointment project failed: calendar_id=%d project_name=%q err=%v", params.CalendarID, params.ProjectName, err)
+		}
+	}
+
 	// Appointment times are advisory when creating records. Do not block creation on
 	// schedule-overlap validation; users can resolve conflicts after the record is visible
 	// on the calendar.
@@ -172,12 +211,12 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 		params.AssigneeID,
 		params.DueAt,
 		params.CustomerID,
-		strings.TrimSpace(params.CustomerName),
-		strings.TrimSpace(params.CustomerPhone),
-		strings.TrimSpace(params.CustomerRemark),
+		params.CustomerName,
+		params.CustomerPhone,
+		params.CustomerRemark,
 		params.ProjectID,
-		strings.TrimSpace(params.ProjectName),
-		strings.TrimSpace(params.ServiceName),
+		params.ProjectName,
+		params.ServiceName,
 	).Scan(
 		&rec.ID,
 		&rec.WorkspaceID,
@@ -245,6 +284,16 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	}
 
 	return &rec, nil
+}
+
+func (r *Repository) upsertAppointmentProject(ctx context.Context, tx pgx.Tx, calendarID int64, projectName string, userID int64) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO appointment_projects (calendar_id, name, usage_count, last_used_at, created_by)
+		VALUES ($1, $2, 1, NOW(), $3)
+		ON CONFLICT (calendar_id, name) WHERE deleted_at IS NULL
+		DO UPDATE SET usage_count = appointment_projects.usage_count + 1, last_used_at = NOW(), updated_at = NOW()
+	`, calendarID, projectName, userID)
+	return err
 }
 
 func shouldCheckScheduleConflict(calendarID int64, assigneeID *int64, startAt *time.Time, endAt *time.Time, allDay bool, status string) bool {
@@ -1106,4 +1155,30 @@ func (r *Repository) GetBasicInfo(ctx context.Context, id int64) (*BasicRecordIn
 	}
 
 	return &item, nil
+}
+
+type CustomerSnapshot struct {
+	ID         int64
+	CalendarID int64
+	Name       string
+	Phone      string
+	Remark     string
+}
+
+func (r *Repository) FindCustomerByPhone(ctx context.Context, calendarID int64, phone string) (*CustomerSnapshot, error) {
+	var c CustomerSnapshot
+	err := r.db.QueryRow(ctx, `SELECT id, calendar_id, COALESCE(name,''), COALESCE(phone,''), COALESCE(remark,'') FROM customers WHERE calendar_id=$1 AND phone=$2 AND deleted_at IS NULL LIMIT 1`, calendarID, strings.TrimSpace(phone)).Scan(&c.ID, &c.CalendarID, &c.Name, &c.Phone, &c.Remark)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (r *Repository) CreateCustomer(ctx context.Context, calendarID int64, name, phone, remark string, userID int64) (*CustomerSnapshot, error) {
+	var c CustomerSnapshot
+	err := r.db.QueryRow(ctx, `INSERT INTO customers(calendar_id,name,phone,remark,created_by) VALUES($1,$2,NULLIF($3,''),$4,$5) RETURNING id,calendar_id,name,COALESCE(phone,''),COALESCE(remark,'')`, calendarID, strings.TrimSpace(name), strings.TrimSpace(phone), strings.TrimSpace(remark), userID).Scan(&c.ID, &c.CalendarID, &c.Name, &c.Phone, &c.Remark)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
