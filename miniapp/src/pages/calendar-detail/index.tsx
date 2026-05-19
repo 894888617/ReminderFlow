@@ -115,7 +115,7 @@ export default function CalendarDetailPage() {
 
     Taro.showModal({
       title: '确认删除日历',
-      content: '日历内记录、提醒将一并删除，确认继续吗？',
+      content: '日历内预约记录将一并删除，确认继续吗？',
       confirmText: '删除',
       confirmColor: '#ef4444',
       success: async (res) => {
