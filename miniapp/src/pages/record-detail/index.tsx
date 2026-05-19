@@ -22,6 +22,7 @@ import {
 } from '../../utils/recordStatus'
 
 import { getStoredToken } from '../../utils/auth'
+import { returnToCalendar } from '../../utils/calendarReturn'
 import './index.scss'
 
 function formatDateTime(value?: string | null) {
@@ -55,6 +56,9 @@ export default function RecordDetailPage() {
 
   const [record, setRecord] = useState<RecordItem | null>(null)
   const [logs, setLogs] = useState<OperationLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
   const currentUser = Taro.getStorageSync('user')
@@ -87,15 +91,30 @@ export default function RecordDetailPage() {
     }
 
     try {
-      const [detail, logList] = await Promise.all([
-        getRecordDetail(recordId),
-        getRecordLogs(recordId),
-      ])
+      setLoading(true)
+      setLoadError('')
+      setNotFound(false)
+      const detail = await getRecordDetail(recordId)
 
       setRecord(detail)
-      setLogs(logList || [])
-    } catch (err) {
+      try {
+        const logList = await getRecordLogs(recordId)
+        setLogs(Array.isArray(logList) ? logList : [])
+      } catch (logErr) {
+        console.warn('load logs failed', logErr)
+        setLogs([])
+      }
+    } catch (err: any) {
       console.error(err)
+      setRecord(null)
+      setLogs([])
+      if (err?.code === 4000 || err?.statusCode === 404) {
+        setNotFound(true)
+      } else {
+        setLoadError('记录加载失败，请稍后重试')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -124,18 +143,21 @@ export default function RecordDetailPage() {
       })
 
       await updateRecordStatus(record.id, nextStatus)
-
-      Taro.hideLoading()
       Taro.showToast({
         title: '状态已更新',
         icon: 'success',
       })
 
       await loadData()
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      if (err?.code === 4000 || err?.statusCode === 404) {
+        Taro.showToast({ title: '记录不存在，无法修改状态', icon: 'none' })
+      } else {
+        Taro.showToast({ title: '状态更新失败', icon: 'none' })
+      }
+    } finally {
       Taro.hideLoading()
-      Taro.showToast({ title: '状态更新失败', icon: 'none' })
     }
   }
 
@@ -192,10 +214,27 @@ export default function RecordDetailPage() {
     })
   }
 
+  if (loading) {
+    return (
+      <View className='container'>
+        <View className='empty-box'>{loadError || '记录加载失败，请稍后重试'}</View>
+      </View>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <View className='container'>
+        <View className='empty-box'>记录不存在或已被删除</View>
+        <View className='back-btn' onClick={() => returnToCalendar()}>返回</View>
+      </View>
+    )
+  }
+
   if (!record) {
     return (
       <View className='container'>
-        <View className='empty-box'>记录加载中...</View>
+        <View className='empty-box'>{loadError || '记录加载失败，请稍后重试'}</View>
       </View>
     )
   }

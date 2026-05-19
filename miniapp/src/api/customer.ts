@@ -9,7 +9,7 @@ export interface Customer {
 }
 
 function toCustomerArray(raw: any): Customer[] {
-  const candidate = raw?.data ?? raw?.list ?? raw?.items ?? raw
+  const candidate = raw?.data?.data ?? raw?.data?.list ?? raw?.data?.items ?? raw?.data ?? raw?.list ?? raw?.items ?? raw
   return Array.isArray(candidate) ? candidate : []
 }
 
