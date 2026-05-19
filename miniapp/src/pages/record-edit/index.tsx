@@ -145,12 +145,11 @@ export default function RecordEditPage() {
       setStartTime(start.time)
       setEndTime(end.time)
 
-      const memberList = await listCalendarMembers(detail.workspace_id)
+      const memberList = await listCalendarMembers(detail.calendar_id || detail.workspace_id || 0)
       setMembers(memberList || [])
-
-      Taro.hideLoading()
     } catch (err) {
       console.error(err)
+    } finally {
       Taro.hideLoading()
     }
   }
@@ -236,8 +235,6 @@ export default function RecordEditPage() {
         await updateRecordStatus(recordId, status)
       }
 
-      Taro.hideLoading()
-
       Taro.showToast({
         title: '保存成功',
         icon: 'success',
@@ -250,8 +247,8 @@ export default function RecordEditPage() {
       }, 500)
     } catch (err) {
       console.error(err)
-      Taro.hideLoading()
     } finally {
+      Taro.hideLoading()
       setSubmitting(false)
     }
   }
@@ -293,9 +290,10 @@ export default function RecordEditPage() {
           })
 
           setTimeout(() => {
-            if (record?.workspace_id) {
+            if (record?.calendar_id || record?.workspace_id) {
+              const targetCalendarId = record.calendar_id || record.workspace_id
               Taro.redirectTo({
-                url: `/pages/calendar-detail/index?id=${record.workspace_id}`,
+                url: `/pages/calendar/index?calendar_id=${targetCalendarId}`,
               })
             } else {
               Taro.redirectTo({
