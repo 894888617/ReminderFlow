@@ -145,12 +145,11 @@ export default function RecordEditPage() {
       setStartTime(start.time)
       setEndTime(end.time)
 
-      const memberList = await listCalendarMembers(detail.workspace_id)
+      const memberList = await listCalendarMembers(detail.calendar_id || detail.workspace_id || 0)
       setMembers(memberList || [])
-
-      Taro.hideLoading()
     } catch (err) {
       console.error(err)
+    } finally {
       Taro.hideLoading()
     }
   }
