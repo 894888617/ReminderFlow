@@ -16,6 +16,10 @@ import (
 	"reminder-flow/pkg/response"
 )
 
+type errMeta interface {
+	SQLState() string
+}
+
 type Handler struct {
 	repo                *Repository
 	subscriptionService *subscription.Service
@@ -47,10 +51,14 @@ type CreateRecordRequest struct {
 	CustomerName      string  `json:"customer_name"`
 	CustomerPhone     string  `json:"customer_phone"`
 	CustomerRemark    string  `json:"customer_remark"`
+	SaveToLibrary     *bool   `json:"save_customer_to_library"`
 	ProjectID         *int64  `json:"project_id"`
 	ProjectName       string  `json:"project_name"`
 	SaveToCustomer    *bool   `json:"save_to_customer"`
 	ServiceName       string  `json:"service_name"`
+	StartTime         string  `json:"start_time"`
+	EndTime           string  `json:"end_time"`
+	Status            string  `json:"status"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -138,7 +146,7 @@ func (h *Handler) Create(c *gin.Context) {
 		calendarAllDay = *req.CalendarAllDay
 	}
 
-	requestSaveToCustomer := req.SaveToCustomer != nil && *req.SaveToCustomer
+	requestSaveToCustomer := (req.SaveToCustomer != nil && *req.SaveToCustomer) || (req.SaveToLibrary != nil && *req.SaveToLibrary)
 	if req.CustomerID != nil {
 		requestSaveToCustomer = false
 	}
@@ -181,8 +189,8 @@ func (h *Handler) Create(c *gin.Context) {
 		CustomerPhone:     req.CustomerPhone,
 		CustomerRemark:    req.CustomerRemark,
 		ProjectID:         req.ProjectID,
-		ProjectName:       req.ProjectName,
-		ServiceName:       req.ServiceName,
+		ProjectName:       strings.TrimSpace(firstNonEmpty(req.ProjectName, req.ServiceName)),
+		ServiceName:       strings.TrimSpace(firstNonEmpty(req.ServiceName, req.ProjectName)),
 	})
 
 	if err != nil {
@@ -190,8 +198,7 @@ func (h *Handler) Create(c *gin.Context) {
 			c.JSON(409, gin.H{"code": "SCHEDULE_CONFLICT", "message": "该负责人该时间段已有安排", "msg": "该负责人该时间段已有安排"})
 			return
 		}
-		log.Printf("[record.create] failed: user_id=%d calendar_id=%d body=%+v err=%v", currentUserID, calendarID, req, err)
-		log.Printf("[record.create] stack trace: %+v", err)
+		log.Printf("[create record failed] message=%v stack=%+v body=%+v user_id=%d calendar_id=%d sqlCode=%v detail=%v constraint=%v", err, err, req, currentUserID, calendarID, extractErrCode(err), extractErrDetail(err), extractErrConstraint(err))
 		response.Internal(c, "create_record_failed")
 		return
 	}
@@ -233,6 +240,25 @@ func (h *Handler) Create(c *gin.Context) {
 
 	response.OK(c, rec)
 }
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func extractErrCode(err error) string {
+	var e errMeta
+	if errors.As(err, &e) {
+		return e.SQLState()
+	}
+	return ""
+}
+func extractErrDetail(err error) string     { return "" }
+func extractErrConstraint(err error) string { return "" }
 
 func (h *Handler) List(c *gin.Context) {
 	currentUserID, ok := middleware.GetCurrentUserID(c)

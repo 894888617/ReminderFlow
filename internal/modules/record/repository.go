@@ -182,7 +182,7 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 			project_name,
 			service_name
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING',  $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, 'PENDING',  $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING
 			id,
 			COALESCE(workspace_id, calendar_id, 0),

@@ -95,6 +95,7 @@ export interface CreateRecordParams {
   customer_name?: string;
   customer_phone?: string;
   customer_remark?: string;
+  save_customer_to_library?: boolean;
   save_to_customer?: boolean;
   project_id?: number;
   project_name?: string;

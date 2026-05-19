@@ -243,38 +243,44 @@ export default function RecordCreatePage() {
     const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
     const calendarAllDay = !finalStartTime;
 
+    const buildPayload = (overrides?: Partial<any>) => ({
+      workspace_id: calendarId,
+      calendar_id: calendarId,
+      title: finalTitle,
+      content: [
+        customerName.trim() ? `客户：${customerName.trim()}` : "",
+        customerPhone.trim() ? `电话：${customerPhone.trim()}` : "",
+        serviceName.trim() ? `项目：${serviceName.trim()}` : "",
+        content.trim(),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      assignee_id: assigneeId,
+      due_at: calendarStartAt,
+      start_time: calendarStartAt,
+      end_time: null,
+      status: statusOptions[statusIndex].value,
+      calendar_start_at: calendarStartAt,
+      calendar_all_day: calendarAllDay,
+      appointment_status: statusOptions[statusIndex].value,
+      customer_id: customerId ?? null,
+      customer_name: customerName.trim(),
+      customer_phone: customerPhone.trim(),
+      customer_remark: customerRemark.trim(),
+      save_customer_to_library: customerId ? false : saveToCustomer,
+      project_id: null,
+      project_name: serviceName.trim(),
+      ...overrides,
+    });
     try {
       setSubmitting(true);
 
       Taro.showLoading({
-        title: "创建中",
+        title: "保存中...",
         mask: true,
       });
 
-      const payload = {
-        workspace_id: calendarId,
-        calendar_id: calendarId,
-        title: finalTitle,
-        content: [
-          customerName.trim() ? `客户：${customerName.trim()}` : "",
-          customerPhone.trim() ? `电话：${customerPhone.trim()}` : "",
-          serviceName.trim() ? `项目：${serviceName.trim()}` : "",
-          content.trim(),
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        assignee_id: assigneeId,
-        due_at: calendarStartAt,
-        calendar_start_at: calendarStartAt,
-        calendar_all_day: calendarAllDay,
-        appointment_status: statusOptions[statusIndex].value,
-        customer_id: customerId,
-        customer_name: customerName.trim(),
-        customer_phone: customerPhone.trim(),
-        customer_remark: customerRemark.trim(),
-        save_to_customer: customerId ? false : saveToCustomer,
-        service_name: serviceName.trim(),
-      };
+      const payload = buildPayload();
 
       if (process.env.NODE_ENV === 'development') {
         console.log('create record payload', payload);
@@ -307,18 +313,36 @@ export default function RecordCreatePage() {
           icon: "none",
         });
       } else if (err?.code === 'CUSTOMER_PHONE_EXISTS') {
+        Taro.hideLoading();
         const customer = err?.customer || {};
-        const modal = await Taro.showModal({ title: '手机号重复', content: '该手机号客户已存在，是否使用已有客户信息？', confirmText: '使用已有', cancelText: '不使用' });
+        const modal = await Taro.showModal({ title: '手机号重复', content: '该手机号客户已存在，是否使用已有客户信息？', confirmText: '使用已有客户', cancelText: '不使用' });
         if (modal.confirm) {
-          setCustomerId(Number(customer.id || 0) || undefined);
+          const existingCustomerId = Number(customer.id || 0) || undefined;
+          setCustomerId(existingCustomerId);
           setCustomerName(customer.name || customerName);
           setCustomerPhone(customer.phone || customerPhone);
           setCustomerRemark(customer.remark || customerRemark);
           setSaveToCustomer(false);
+          Taro.showLoading({ title: "保存中...", mask: true });
+          await createRecord(buildPayload({
+            customer_id: existingCustomerId ?? null,
+            customer_name: customer.name || customerName.trim(),
+            customer_phone: customer.phone || customerPhone.trim(),
+            customer_remark: customer.remark || customerRemark.trim(),
+            save_customer_to_library: false,
+          }));
+          Taro.showToast({ title: "创建成功", icon: "success" });
+          return;
         } else {
           setCustomerId(undefined);
           setSaveToCustomer(false);
-          Taro.showToast({ title: '已改为不入客户库，请再次提交', icon: 'none' });
+          Taro.showLoading({ title: "保存中...", mask: true });
+          await createRecord(buildPayload({
+            customer_id: null,
+            save_customer_to_library: false,
+          }));
+          Taro.showToast({ title: "创建成功", icon: "success" });
+          return;
         }
       } else {
         Taro.showToast({ title: '创建预约失败，请稍后重试', icon: 'none' });

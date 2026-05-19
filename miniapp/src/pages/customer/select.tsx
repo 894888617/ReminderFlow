@@ -2,6 +2,7 @@ import { View, Input, Text } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 import { listCustomers, type Customer } from '../../api/customer'
+import './select.scss'
 
 export default function CustomerSelectPage() {
   const r = useRouter()
@@ -33,10 +34,12 @@ export default function CustomerSelectPage() {
     return `${i.name || ''}${i.phone || ''}${i.remark || ''}`.toLowerCase().includes(keyword)
   }), [list, keyword])
 
-  return <View style='padding:24rpx'>
-    <Input value={k} onInput={e => setK(e.detail.value)} onConfirm={load} placeholder='搜索姓名/手机号/备注' />
-    {(filtered || []).length === 0 && !loading ? <Text>暂无客户档案，可手动填写客户信息。</Text> : null}
-    {(filtered || []).map(i => <View key={i.id} onClick={() => {
+  return <View className='customer-select-page'>
+    <View className='safe-top' />
+    <View className='content-card'>
+      <Input className='search-input' value={k} onInput={e => setK(e.detail.value)} onConfirm={load} placeholder='搜索姓名/手机号/备注' />
+      {(filtered || []).length === 0 && !loading ? <Text className='empty'>暂无客户档案，可手动填写客户信息。</Text> : null}
+      {(filtered || []).map(i => <View className='item' key={i.id} onClick={() => {
       const ch = (getCurrentPages().slice(-2)[0] as any)
       const evt = ch?.getOpenerEventChannel?.()
       evt?.emit('customerSelected', {
@@ -46,6 +49,7 @@ export default function CustomerSelectPage() {
         customer_remark: i.remark || '',
       })
       Taro.navigateBack()
-    }}>{i.name || '-'} {i.phone || ''} {i.remark || ''}</View>)}
+      }}><Text>{i.name || '-'}</Text><Text>{i.phone || ''}</Text><Text>{i.remark || ''}</Text></View>)}
+    </View>
   </View>
 }
