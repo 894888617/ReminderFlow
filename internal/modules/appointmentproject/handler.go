@@ -38,7 +38,7 @@ func (h *Handler) List(c *gin.Context) {
 		UsageCount int     `json:"usage_count"`
 		LastUsedAt *string `json:"last_used_at"`
 	}
-	var out []item
+	out := make([]item, 0)
 	for rows.Next() {
 		var it item
 		var t *string

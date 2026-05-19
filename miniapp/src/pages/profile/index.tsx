@@ -68,7 +68,7 @@ export default function ProfilePage() {
         <View className='account-copy-row'>
           <View className='account-copy-main'>
             <Text className='account-copy-label'>账号</Text>
-            <Text className='account-copy-value' selectable>{accountID || '-'}</Text>
+            <Text className='account-copy-value' userSelect>{accountID || '-'}</Text>
           </View>
 
           <View
