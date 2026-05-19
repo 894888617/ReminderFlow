@@ -12,8 +12,12 @@ export interface RecordItem {
   assignee_name?: string;
   status: RecordStatus;
   due_at?: string | null;
+  customer_id?: number;
   customer_name?: string;
   customer_phone?: string;
+  customer_remark?: string;
+  project_id?: number;
+  project_name?: string;
   service_name?: string;
   calendar_start_at?: string;
   calendar_end_at?: string | null;
@@ -87,8 +91,13 @@ export interface CreateRecordParams {
   calendar_end_at?: string | null;
   calendar_all_day?: boolean;
   appointment_status?: string;
+  customer_id?: number;
   customer_name?: string;
   customer_phone?: string;
+  customer_remark?: string;
+  save_to_customer?: boolean;
+  project_id?: number;
+  project_name?: string;
   service_name?: string;
 }
 
@@ -143,8 +152,12 @@ export interface UpdateRecordParams {
   calendar_start_at?: string;
   calendar_end_at?: string | null;
   calendar_all_day?: boolean;
+  customer_id?: number;
   customer_name?: string;
   customer_phone?: string;
+  customer_remark?: string;
+  project_id?: number;
+  project_name?: string;
   service_name?: string;
 }
 
