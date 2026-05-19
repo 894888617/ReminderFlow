@@ -732,7 +732,7 @@ export default function CalendarPage() {
           <View className="nav-calendar-pill">
             <Text className="nav-calendar-name">
               {selectedCalendar?.name || "选择日历"}
-            </Text>
+            </Text> 
           </View>
         </Picker>
 
@@ -741,7 +741,7 @@ export default function CalendarPage() {
             <View className="nav-account-avatar">{accountAvatarText}</View>
             <View className="nav-account-text">{accountText}</View>
           </View>
-          <View className="nav-config-btn" onClick={goCustomer}>客户</View>
+          <View className="nav-config-btn" onClick={goCustomer}>👥</View>
           <View className="nav-config-btn" onClick={handleOpenCalendarActions}>
             ⚙
           </View>
