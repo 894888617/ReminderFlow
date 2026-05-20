@@ -116,24 +116,6 @@
 }
 
 
-.customer-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.customer-header-row .form-label {
-  margin-bottom: 0;
-}
-
-.pill-btn {
-  padding: 8px 20px;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #2563eb;
-  font-size: 22px;
-  line-height: 1.6;
-}
 
 .grid-two {
   display: grid;
@@ -157,8 +139,63 @@
   transform-origin: left center;
 }
 
+
 .clear-link {
   margin-top: 10px;
   font-size: 22px;
   color: #9ca3af;
+}
+
+.customer-top-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.assignee-box-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.assignee-select-box {
+  height: 64px;
+  line-height: 64px;
+  padding: 0 20px;
+  background: #f5f6fa;
+  border-radius: 16px;
+  color: #111827;
+  font-size: 26px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignee-select-box.placeholder {
+  color: #9ca3af;
+}
+
+.assignee-clear {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  color: #9ca3af;
+  line-height: 1;
+  padding: 4px;
+}
+
+.customer-file-btn {
+  flex-shrink: 0;
+  height: 56px;
+  line-height: 56px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #2563eb;
+  font-size: 24px;
+  white-space: nowrap;
 }

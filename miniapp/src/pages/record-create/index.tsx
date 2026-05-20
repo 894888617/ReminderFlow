@@ -84,10 +84,10 @@ export default function RecordCreatePage() {
   }, [memberOptions, assigneeId]);
 
   const selectedAssigneeName = useMemo(() => {
-    if (!assigneeId) return "未分配";
+    if (!assigneeId) return "选择负责人";
 
     const selected = memberOptions.find((item) => item.value === assigneeId);
-    return selected?.label || "未分配";
+    return selected?.label || "选择负责人";
   }, [memberOptions, assigneeId]);
 
   const loadCalendars = async () => {
@@ -213,15 +213,8 @@ export default function RecordCreatePage() {
 
     const finalTitle =
       title.trim() ||
-      [customerName.trim(), serviceName.trim()].filter(Boolean).join(" ");
-
-    if (!finalTitle) {
-      Taro.showToast({
-        title: "请输入标题或客户姓名",
-        icon: "none",
-      });
-      return;
-    }
+      [customerName.trim(), serviceName.trim()].filter(Boolean).join(" ") ||
+      "预约记录";
 
     const finalAppointmentDate = appointmentDate || defaultAppointmentDate;
     const finalStartTime = startTime.trim();
@@ -380,9 +373,20 @@ export default function RecordCreatePage() {
           </View>
         ) : null}
 
-        <View className="form-item customer-header-row">
-          <Text className="form-label">客户信息</Text>
-          <View className="pill-btn" onClick={() => {
+        <View className="customer-top-row">
+          <View className="assignee-box-wrap">
+            {memberOptions.length === 0 ? (
+              <View className="assignee-select-box placeholder">暂无成员可选</View>
+            ) : (
+              <Picker mode="selector" range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => {
+                const index = Number(e.detail.value);
+                const selected = memberOptions[index];
+                if (selected) setAssigneeId(selected.value);
+              }}><View className={assigneeId ? "assignee-select-box" : "assignee-select-box placeholder"}>{selectedAssigneeName}</View></Picker>
+            )}
+            {assigneeId ? <View className="assignee-clear" onClick={() => setAssigneeId(undefined)}>×</View> : null}
+          </View>
+          <View className="customer-file-btn" onClick={() => {
             if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
             const url = `/pages/customer/select?calendar_id=${calendarId}`
             const eventChannel = Taro.navigateTo({ url } as any)
@@ -418,20 +422,6 @@ export default function RecordCreatePage() {
         <View className="grid-two">
           <View className="form-item compact-item"><Text className="form-label">预约日期</Text><Picker mode="date" value={appointmentDate} onChange={(e) => setAppointmentDate(String(e.detail.value))}><View className="datetime-picker">{appointmentDate}</View></Picker></View>
           <View className="form-item compact-item"><Text className="form-label">开始时间（可选）</Text><Picker mode="time" value={startTime || "10:00"} onChange={(e) => setStartTime(String(e.detail.value))}><View className="datetime-picker">{startTime || "选择开始时间"}</View></Picker>{startTime ? (<View className="clear-link" onClick={() => setStartTime("")}>清除开始时间</View>) : null}</View>
-        </View>
-
-        <View className="form-item">
-          <Text className="form-label">负责人</Text>
-          {memberOptions.length === 0 ? (
-            <View className="empty-member">暂无成员可选</View>
-          ) : (
-            <Picker mode="selector" range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => {
-              const index = Number(e.detail.value);
-              const selected = memberOptions[index];
-              if (selected) setAssigneeId(selected.value);
-            }}><View className="picker-value">{selectedAssigneeName}</View></Picker>
-          )}
-          {assigneeId ? <View className="clear-link" onClick={() => setAssigneeId(undefined)}>清除负责人</View> : null}
         </View>
 
         <View className="form-item">
