@@ -12,7 +12,6 @@ export default defineAppConfig({
     "pages/schedule-special/index",
     "pages/customer-history/index",
     "pages/customer/index",
-    "pages/customer/edit",
     "pages/customer/select",
     "pages/record-detail/index",
     "pages/record-edit/index",
