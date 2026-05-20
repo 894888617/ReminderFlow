@@ -44,23 +44,29 @@ export default function CustomerSelectPage() {
 
   return <View className='customer-select-page'>
     <View className='safe-top' />
-    <View className='content-card'>
-      <Input className='search-input' value={k} onInput={e => setK(e.detail.value)} onConfirm={load} placeholder='搜索姓名/手机号/备注' />
-      {!cid ? <Text className='empty'>请先选择日历空间</Text> : null}
-      {cid && loading ? <Text className='empty'>客户加载中...</Text> : null}
-      {cid && !loading && !!loadError ? <Text className='empty'>{loadError}</Text> : null}
-      {cid && !loading && !loadError && !filtered[0] ? <Text className='empty'>暂无客户档案，可手动填写客户信息</Text> : null}
-      {(filtered || []).map(i => <View className='item' key={i.id} onClick={() => {
-      const ch = (getCurrentPages().slice(-2)[0] as any)
-      const evt = ch?.getOpenerEventChannel?.()
-      evt?.emit('customerSelected', {
-        customer_id: i.id,
-        customer_name: i.name || '',
-        customer_phone: i.phone || '',
-        customer_remark: i.remark || '',
-      })
-      Taro.navigateBack()
-      }}><Text>{i.name || '-'}</Text><Text>{i.phone || ''}</Text><Text>{i.remark || ''}</Text></View>)}
+    <View className='customer-select-card'>
+      <Input className='customer-select-search' value={k} onInput={e => setK(e.detail.value)} onConfirm={load} placeholder='搜索姓名/手机号/备注' />
+      {!cid ? <Text className='customer-select-empty'>请先选择日历空间</Text> : null}
+      {cid && loading ? <Text className='customer-select-loading'>客户加载中...</Text> : null}
+      {cid && !loading && !!loadError ? <Text className='customer-select-error'>{loadError}</Text> : null}
+      {cid && !loading && !loadError && !filtered[0] ? <Text className='customer-select-empty'>暂无客户档案，可手动填写客户信息</Text> : null}
+      <View className='customer-select-list'>
+        {(filtered || []).map(i => <View className='customer-select-item' key={i.id} onClick={() => {
+          const ch = (getCurrentPages().slice(-2)[0] as any)
+          const evt = ch?.getOpenerEventChannel?.()
+          evt?.emit('customerSelected', {
+            customer_id: i.id,
+            customer_name: i.name || '',
+            customer_phone: i.phone || '',
+            customer_remark: i.remark || '',
+          })
+          Taro.navigateBack()
+        }}>
+          <Text>{i.name || '-'}</Text>
+          <Text>{i.phone || ''}</Text>
+          <Text>{i.remark || ''}</Text>
+        </View>)}
+      </View>
     </View>
   </View>
 }

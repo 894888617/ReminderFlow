@@ -1,0 +1,116 @@
+.customer-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.customer-page .safe-top {
+  height: env(safe-area-inset-top);
+}
+
+.customer-content-card {
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  margin-top: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.08);
+}
+
+.customer-toolbar {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.customer-search-input {
+  flex: 1;
+  height: 72rpx;
+  background: #f5f6fa;
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  color: #111827;
+  font-size: 28rpx;
+}
+
+.customer-add-btn {
+  padding: 0 24rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 16rpx;
+  background: #2563eb;
+  color: #fff;
+  font-size: 26rpx;
+}
+
+.customer-debug-count {
+  margin-top: 16rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.customer-list {
+  margin-top: 24rpx;
+}
+
+.customer-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border-radius: 18rpx;
+  border: 1rpx solid #e5e7eb;
+  color: #111827;
+  position: relative;
+  z-index: 20;
+}
+
+.customer-name {
+  color: #111827;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.customer-phone,
+.customer-remark {
+  color: #4b5563;
+  font-size: 26rpx;
+}
+
+.customer-actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 12rpx;
+}
+
+.customer-edit-btn {
+  color: #2563eb;
+  font-size: 26rpx;
+}
+
+.customer-delete-btn {
+  color: #dc2626;
+  font-size: 26rpx;
+}
+
+.customer-empty,
+.customer-loading,
+.customer-error {
+  display: block;
+  margin-top: 32rpx;
+  padding: 40rpx 24rpx;
+  text-align: center;
+  border-radius: 18rpx;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 28rpx;
+}
+
+.customer-error {
+  color: #dc2626;
+}
