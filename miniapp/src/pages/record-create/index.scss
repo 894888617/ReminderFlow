@@ -114,3 +114,51 @@
   font-size: 26px;
   font-weight: 800;
 }
+
+
+.customer-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.customer-header-row .form-label {
+  margin-bottom: 0;
+}
+
+.pill-btn {
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 22px;
+  line-height: 1.6;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.compact-item {
+  margin-bottom: 22px;
+}
+
+.compact-checkbox {
+  margin-top: -4px;
+  margin-bottom: 22px;
+  font-size: 24px;
+  color: #4b5563;
+}
+
+.compact-checkbox checkbox {
+  transform: scale(0.9);
+  transform-origin: left center;
+}
+
+.clear-link {
+  margin-top: 10px;
+  font-size: 22px;
+  color: #9ca3af;
+}
