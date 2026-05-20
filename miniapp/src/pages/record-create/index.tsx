@@ -14,14 +14,13 @@ import { canCreateRecord } from "../../utils/permission";
 
 import { getStoredToken, getStoredUser } from "../../utils/auth";
 import { getUserNameDisplay } from "../../utils/userDisplay";
-import { RECORD_STATUS_OPTIONS } from "../../utils/recordStatus";
 import {
   returnToCalendar,
   saveCalendarReturnContext,
 } from "../../utils/calendarReturn";
 import "./index.scss";
 
-const statusOptions = RECORD_STATUS_OPTIONS;
+const DEFAULT_STATUS = "pending";
 
 function buildDateTime(date: string, time = "00:00") {
   if (!date) return undefined;
@@ -69,22 +68,8 @@ export default function RecordCreatePage() {
   const [content, setContent] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(defaultAppointmentDate);
   const [startTime, setStartTime] = useState("");
-  const [statusIndex, setStatusIndex] = useState(0);
 
   const [submitting, setSubmitting] = useState(false);
-
-  const calendarNames = useMemo(() => {
-    return calendars.map((item) => item.name);
-  }, [calendars]);
-
-  const selectedCalendarIndex = useMemo(() => {
-    if (!calendarId) return -1;
-    return calendars.findIndex((item) => item.id === calendarId);
-  }, [calendars, calendarId]);
-
-  const selectedCalendar = useMemo(() => {
-    return calendars.find((item) => item.id === calendarId);
-  }, [calendars, calendarId]);
 
   const memberOptions = useMemo(() => {
     return members.map((item) => ({
@@ -220,7 +205,7 @@ export default function RecordCreatePage() {
 
     if (!calendarId) {
       Taro.showToast({
-        title: "请选择日历",
+        title: "请先选择日历",
         icon: "none",
       });
       return;
@@ -258,10 +243,10 @@ export default function RecordCreatePage() {
       due_at: calendarStartAt,
       start_time: calendarStartAt,
       end_time: null,
-      status: statusOptions[statusIndex].value,
+      status: DEFAULT_STATUS,
       calendar_start_at: calendarStartAt,
       calendar_all_day: calendarAllDay,
-      appointment_status: statusOptions[statusIndex].value,
+      appointment_status: DEFAULT_STATUS,
       customer_id: customerId ?? null,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim(),
@@ -383,52 +368,21 @@ export default function RecordCreatePage() {
   return (
     <View className="container">
       <View className="form-card">
-        <View className="form-item">
-          <Text className="form-label">所属日历</Text>
-
-          {calendars.length === 0 ? (
+        {calendars.length === 0 ? (
+          <View className="form-item">
             <View className="empty-calendar-guide">
               <View className="empty-calendar-title">暂无可创建记录的日历</View>
               <View className="empty-calendar-desc">
                 你需要先创建一个日历，或者加入有创建权限的日历，才能添加记录。
               </View>
-
-              <View
-                className="empty-calendar-btn"
-                onClick={() => {
-                  Taro.navigateTo({
-                    url: "/pages/calendar-create/index",
-                  });
-                }}
-              >
-                去创建日历
-              </View>
+              <View className="empty-calendar-btn" onClick={() => Taro.navigateTo({ url: "/pages/calendar-create/index" })}>去创建日历</View>
             </View>
-          ) : (
-            <Picker
-              mode="selector"
-              range={calendarNames}
-              value={selectedCalendarIndex >= 0 ? selectedCalendarIndex : 0}
-              onChange={(e) => {
-                const index = Number(e.detail.value);
-                const selected = calendars[index];
+          </View>
+        ) : null}
 
-                if (selected) {
-                  setCalendarId(selected.id);
-                }
-              }}
-            >
-              <View className="picker-value">
-                {selectedCalendar?.name || "请选择日历"}
-              </View>
-            </Picker>
-          )}
-        </View>
-
-
-        <View className="form-item">
+        <View className="form-item customer-header-row">
           <Text className="form-label">客户信息</Text>
-          <View className="clear-time" onClick={() => {
+          <View className="pill-btn" onClick={() => {
             if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
             const url = `/pages/customer/select?calendar_id=${calendarId}`
             const eventChannel = Taro.navigateTo({ url } as any)
@@ -441,149 +395,49 @@ export default function RecordCreatePage() {
                 setSaveToCustomer(false)
               })
             })
-          }}>选择已有客户</View>
-        </View>
-
-        <View className="form-item">
-          <Text className="form-label">客户姓名</Text>
-          <Input
-            className="form-input"
-            value={customerName}
-            // placeholder="例如：客户A"
-            maxlength={128}
-            onInput={(e) => setCustomerName(e.detail.value)}
-          />
-        </View>
-
-        <View className="form-item">
-          <Text className="form-label">客户手机号</Text>
-          <Input
-            className="form-input"
-            value={customerPhone}
-            // placeholder="例如：138xxxx8888"
-            maxlength={32}
-            onInput={(e) => setCustomerPhone(e.detail.value)}
-          />
-        </View>
-
-        <View className="form-item">
-          <Text className="form-label">客户备注</Text>
-          <Input className="form-input" value={customerRemark} maxlength={255} onInput={(e) => setCustomerRemark(e.detail.value)} />
-        </View>
-
-        {customerId ? null : <View className="form-item"><CheckboxGroup onChange={(e)=>setSaveToCustomer((e.detail.value||[]).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
-
-        <View className="form-item">
-          <Text className="form-label">服务项目</Text>
-          <Input
-            className="form-input"
-            value={serviceName}
-            // placeholder="例如：美甲护理"
-            maxlength={128}
-            onInput={(e) => setServiceName(e.detail.value)}
-          />
+          }}>客户档案</View>
         </View>
 
         <View className="form-item">
           <Text className="form-label">标题</Text>
-          <Input
-            className="form-input"
-            value={title}
-            placeholder="可留空自动生成 客户姓名 + 服务项目"
-            maxlength={200}
-            onInput={(e) => setTitle(e.detail.value)}
-          />
+          <Input className="form-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
         </View>
 
-        <View className="form-item">
-          <Text className="form-label">备注</Text>
-          <Textarea
-            className="form-textarea"
-            value={content}
-            // placeholder="历史偏好、注意事项、补款等备注"
-            maxlength={1000}
-            onInput={(e) => setContent(e.detail.value)}
-          />
+        <View className="grid-two">
+          <View className="form-item compact-item"><Text className="form-label">客户姓名</Text><Input className="form-input" value={customerName} maxlength={128} onInput={(e) => setCustomerName(e.detail.value)} /></View>
+          <View className="form-item compact-item"><Text className="form-label">客户手机号</Text><Input className="form-input" value={customerPhone} maxlength={32} onInput={(e) => setCustomerPhone(e.detail.value)} /></View>
+        </View>
+
+        <View className="grid-two">
+          <View className="form-item compact-item"><Text className="form-label">服务项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
+          <View className="form-item compact-item"><Text className="form-label">客户备注</Text><Input className="form-input" value={customerRemark} maxlength={255} onInput={(e) => setCustomerRemark(e.detail.value)} /></View>
+        </View>
+
+        {customerId ? null : <View className="form-item compact-checkbox"><CheckboxGroup onChange={(e) => setSaveToCustomer((e.detail.value || []).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
+
+        <View className="grid-two">
+          <View className="form-item compact-item"><Text className="form-label">预约日期</Text><Picker mode="date" value={appointmentDate} onChange={(e) => setAppointmentDate(String(e.detail.value))}><View className="datetime-picker">{appointmentDate}</View></Picker></View>
+          <View className="form-item compact-item"><Text className="form-label">开始时间（可选）</Text><Picker mode="time" value={startTime || "10:00"} onChange={(e) => setStartTime(String(e.detail.value))}><View className="datetime-picker">{startTime || "选择开始时间"}</View></Picker>{startTime ? (<View className="clear-link" onClick={() => setStartTime("")}>清除开始时间</View>) : null}</View>
         </View>
 
         <View className="form-item">
           <Text className="form-label">负责人</Text>
-
           {memberOptions.length === 0 ? (
             <View className="empty-member">暂无成员可选</View>
           ) : (
-            <Picker
-              mode="selector"
-              range={memberOptions.map((item) => item.label)}
-              value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0}
-              onChange={(e) => {
-                const index = Number(e.detail.value);
-                const selected = memberOptions[index];
-
-                if (selected) {
-                  setAssigneeId(selected.value);
-                }
-              }}
-            >
-              <View className="picker-value">{selectedAssigneeName}</View>
-            </Picker>
+            <Picker mode="selector" range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => {
+              const index = Number(e.detail.value);
+              const selected = memberOptions[index];
+              if (selected) setAssigneeId(selected.value);
+            }}><View className="picker-value">{selectedAssigneeName}</View></Picker>
           )}
-
-          {assigneeId && (
-            <View
-              className="clear-time"
-              onClick={() => {
-                setAssigneeId(undefined);
-              }}
-            >
-              清除负责人
-            </View>
-          )}
+          {assigneeId ? <View className="clear-link" onClick={() => setAssigneeId(undefined)}>清除负责人</View> : null}
         </View>
 
         <View className="form-item">
-          <Text className="form-label">预约日期</Text>
-          <Picker
-            mode="date"
-            value={appointmentDate}
-            onChange={(e) => setAppointmentDate(String(e.detail.value))}
-          >
-            <View className="datetime-picker">{appointmentDate}</View>
-          </Picker>
+          <Text className="form-label">备注</Text>
+          <Textarea className="form-textarea" value={content} maxlength={1000} onInput={(e) => setContent(e.detail.value)} />
         </View>
-
-        <View className="form-item">
-          <Text className="form-label">开始时间（可选）</Text>
-          <Picker
-            mode="time"
-            value={startTime || "10:00"}
-            onChange={(e) => setStartTime(String(e.detail.value))}
-          >
-            <View className="datetime-picker">
-              {startTime || "选择开始时间"}
-            </View>
-          </Picker>
-          {startTime ? (
-            <View className="clear-time" onClick={() => setStartTime("")}>
-              清除开始时间
-            </View>
-          ) : null}
-        </View>
-
-        <View className="form-item">
-          <Text className="form-label">状态</Text>
-          <Picker
-            mode="selector"
-            range={statusOptions.map((item) => item.label)}
-            value={statusIndex}
-            onChange={(e) => setStatusIndex(Number(e.detail.value))}
-          >
-            <View className="picker-value">
-              {statusOptions[statusIndex].label}
-            </View>
-          </Picker>
-        </View>
-
       </View>
 
       <View
