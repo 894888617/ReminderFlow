@@ -6,7 +6,7 @@ import './select.scss'
 
 export default function CustomerPage() {
   const r = useRouter()
-  const cid = Number(r.params.calendar_id || Taro.getStorageSync('current_calendar_id') || 0)
+  const [cid, setCid] = useState(0)
   const [k, setK] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(false)
@@ -15,7 +15,9 @@ export default function CustomerPage() {
   const customerList = useMemo(() => (Array.isArray(customers) ? customers : []), [customers])
 
   const load = async () => {
-    if (!cid) {
+    const currentCid = Number(r.params.calendar_id || Taro.getStorageSync('current_calendar_id') || 0)
+    setCid(currentCid)
+    if (!currentCid) {
       setCustomers([])
       setLoadError('请先选择日历空间')
       return
@@ -23,7 +25,7 @@ export default function CustomerPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const res = await listCustomers(cid, k)
+      const res = await listCustomers(currentCid, k)
       const raw = (res as any)?.data?.data || (res as any)?.data?.list || (res as any)?.data?.items || res
       const list = Array.isArray(raw) ? raw : []
       setCustomers(list)
