@@ -14,6 +14,7 @@ type Customer struct {
 	Name       string    `json:"name"`
 	Phone      string    `json:"phone"`
 	Remark     string    `json:"remark"`
+	ArchivedAt time.Time `json:"archived_at,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
@@ -21,9 +22,14 @@ type Repository struct{ db *pgxpool.Pool }
 
 func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }
 
-func (r *Repository) List(ctx context.Context, calendarID int64, keyword string) ([]Customer, error) {
+func (r *Repository) List(ctx context.Context, calendarID int64, keyword string, archived bool) ([]Customer, error) {
 	q := `SELECT id,calendar_id,name,COALESCE(phone,''),COALESCE(remark,''),updated_at FROM customers WHERE calendar_id=$1 AND deleted_at IS NULL`
 	args := []any{calendarID}
+	if archived {
+		q += ` AND archived_at IS NOT NULL`
+	} else {
+		q += ` AND archived_at IS NULL`
+	}
 	if keyword = strings.TrimSpace(keyword); keyword != "" {
 		q += ` AND (name ILIKE $2 OR phone ILIKE $2 OR remark ILIKE $2)`
 		args = append(args, "%"+keyword+"%")
@@ -79,4 +85,22 @@ func (r *Repository) FindByPhone(ctx context.Context, calendarID int64, phone st
 		return nil, err
 	}
 	return &c, nil
+}
+
+func (r *Repository) Archive(ctx context.Context, id int64) (*Customer, error) {
+	var out Customer
+	err := r.db.QueryRow(ctx, `UPDATE customers SET archived_at=NOW(),updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL RETURNING id,calendar_id,name,COALESCE(phone,''),COALESCE(remark,''),updated_at`, id).Scan(&out.ID, &out.CalendarID, &out.Name, &out.Phone, &out.Remark, &out.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (r *Repository) Unarchive(ctx context.Context, id int64) (*Customer, error) {
+	var out Customer
+	err := r.db.QueryRow(ctx, `UPDATE customers SET archived_at=NULL,updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL RETURNING id,calendar_id,name,COALESCE(phone,''),COALESCE(remark,''),updated_at`, id).Scan(&out.ID, &out.CalendarID, &out.Name, &out.Phone, &out.Remark, &out.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
