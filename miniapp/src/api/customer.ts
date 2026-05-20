@@ -13,9 +13,9 @@ function toCustomerArray(raw: any): Customer[] {
   return Array.isArray(candidate) ? candidate : []
 }
 
-export const listCustomers = async (calendarId: number, keyword = '') => {
+export const listCustomers = async (calendarId: number, keyword = '', archived = false) => {
   const res = await request<any>({
-    url: `/api/calendars/${calendarId}/customers?keyword=${encodeURIComponent(keyword)}`,
+    url: `/api/calendars/${calendarId}/customers?keyword=${encodeURIComponent(keyword)}&archived=${archived ? 'true' : 'false'}`,
     method: 'GET',
   })
   return toCustomerArray(res)
@@ -27,4 +27,5 @@ export const createCustomer = (calendarId: number, data: Partial<Customer>) =>
 export const updateCustomer = (id: number, data: Partial<Customer>) =>
   request<Customer>({ url: `/api/customers/${id}`, method: 'PUT', data })
 
-export const deleteCustomer = (id: number) => request({ url: `/api/customers/${id}`, method: 'DELETE' })
+export const archiveCustomer = (id: number) => request<Customer>({ url: `/api/customers/${id}/archive`, method: 'POST' })
+export const unarchiveCustomer = (id: number) => request<Customer>({ url: `/api/customers/${id}/unarchive`, method: 'POST' })

@@ -1,7 +1,7 @@
 import { View, Input, Text } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
-import { useMemo, useState } from 'react'
-import { deleteCustomer, listCustomers, updateCustomer, type Customer } from '../../api/customer'
+import { useEffect, useMemo, useState } from 'react'
+import { archiveCustomer, listCustomers, unarchiveCustomer, updateCustomer, type Customer } from '../../api/customer'
 import './index.scss'
 
 type EditableField = 'name' | 'phone' | 'remark'
@@ -16,6 +16,7 @@ export default function CustomerPage() {
   const [editingCell, setEditingCell] = useState<{ customerId: number; field: EditableField } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [saving, setSaving] = useState(false)
+  const [archivedMode, setArchivedMode] = useState(false)
 
   const customerList = useMemo(() => (Array.isArray(customers) ? customers : []), [customers])
 
@@ -30,7 +31,7 @@ export default function CustomerPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const res = await listCustomers(currentCid, k)
+      const res = await listCustomers(currentCid, k, archivedMode)
       const list = Array.isArray(res) ? res : []
       setCustomers(list)
     } catch (err) {
@@ -43,6 +44,10 @@ export default function CustomerPage() {
   }
 
   useDidShow(load)
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archivedMode])
 
   const filteredCustomers = useMemo(() => {
     const kw = k.trim().toLowerCase()
@@ -56,6 +61,7 @@ export default function CustomerPage() {
   }, [customerList, k])
 
   const beginEdit = (customer: Customer, field: EditableField) => {
+    if (archivedMode) return
     setEditingCell({ customerId: customer.id, field })
     setEditingValue(String(customer[field] || ''))
   }
@@ -85,7 +91,16 @@ export default function CustomerPage() {
 
     setSaving(true)
     try {
-      await updateCustomer(customer.id, { calendar_id: cid, [field]: nextValue })
+      if (field === 'name' && !nextValue) {
+        Taro.showToast({ title: '姓名不能为空', icon: 'none' })
+        return
+      }
+      await updateCustomer(customer.id, {
+        calendar_id: cid,
+        name: field === 'name' ? nextValue : String(customer.name || '').trim(),
+        phone: field === 'phone' ? nextValue : String(customer.phone || '').trim(),
+        remark: field === 'remark' ? nextValue : String(customer.remark || '').trim(),
+      })
       setCustomers((prev) => prev.map((item) => (item.id === customer.id ? { ...item, [field]: nextValue } : item)))
       cancelEdit()
       Taro.showToast({ title: '修改成功', icon: 'success' })
@@ -128,19 +143,37 @@ export default function CustomerPage() {
     )
   }
 
-  const onDelete = (id: number) => {
+  const onArchive = (id: number) => {
     Taro.showModal({
-      title: '确认删除',
-      content: '删除后不可恢复，是否继续？',
+      title: '确认归档',
+      content: '确认归档该客户吗？归档后默认列表将不再显示，但可以在归档列表中恢复。',
       success: async (res) => {
         if (!res.confirm) return
         try {
-          await deleteCustomer(id)
-          Taro.showToast({ title: '删除成功', icon: 'success' })
+          await archiveCustomer(id)
+          Taro.showToast({ title: '归档成功', icon: 'success' })
           await load()
         } catch (err) {
           console.error(err)
-          Taro.showToast({ title: '删除失败，请稍后重试', icon: 'none' })
+          Taro.showToast({ title: '操作失败，请稍后重试', icon: 'none' })
+        }
+      },
+    })
+  }
+
+  const onUnarchive = (id: number) => {
+    Taro.showModal({
+      title: '确认取消归档',
+      content: '确认将该客户恢复到客户列表吗？',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await unarchiveCustomer(id)
+          Taro.showToast({ title: '已恢复', icon: 'success' })
+          await load()
+        } catch (err) {
+          console.error(err)
+          Taro.showToast({ title: '操作失败，请稍后重试', icon: 'none' })
         }
       },
     })
@@ -152,11 +185,21 @@ export default function CustomerPage() {
   return <View className='customer-page'>
     <View className='safe-top' />
     <View className='customer-content-card'>
+      <Text
+        className='customer-table-text'
+        onClick={() => {
+          setArchivedMode((prev) => !prev)
+          setEditingCell(null)
+          setEditingValue('')
+        }}
+      >
+        {archivedMode ? '返回客户列表' : '查看归档'}
+      </Text>
       <Input className='customer-search-input' placeholder='搜索姓名/手机号/备注' value={k} onInput={(e) => setK(e.detail.value)} onConfirm={load} />
       {!cid ? <Text className='customer-empty'>请先选择日历空间</Text> : null}
       {cid && loading ? <Text className='customer-loading'>客户加载中...</Text> : null}
       {cid && !loading && !!loadError ? <Text className='customer-error'>{loadError}</Text> : null}
-      {showEmpty ? <Text className='customer-empty'>暂无客户档案，创建预约时保存客户后会自动出现在这里</Text> : null}
+      {showEmpty ? <Text className='customer-empty'>{archivedMode ? '暂无归档客户' : '暂无客户档案，创建预约时保存客户后会自动出现在这里'}</Text> : null}
       {showNoSearchResult ? <Text className='customer-empty'>未找到匹配客户</Text> : null}
       {cid && !loading && !loadError && filteredCustomers.length > 0 ? <View className='customer-table-card'>
         <View className='customer-table'>
@@ -173,7 +216,11 @@ export default function CustomerPage() {
                 <View className='customer-table-cell customer-table-phone'>{renderEditableCell(i, 'phone')}</View>
                 <View className='customer-table-cell'>{renderEditableCell(i, 'remark')}</View>
                 <View className='customer-table-cell'>
-                  <Text className='customer-delete-btn' onClick={() => onDelete(i.id)}>删除</Text>
+                  {archivedMode ? (
+                    <Text className='customer-delete-btn' onClick={() => onUnarchive(i.id)}>取消归档</Text>
+                  ) : (
+                    <Text className='customer-delete-btn' onClick={() => onArchive(i.id)}>归档</Text>
+                  )}
                 </View>
               </View>
             ))}

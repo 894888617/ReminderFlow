@@ -29,7 +29,8 @@ func (h *Handler) List(c *gin.Context) {
 		response.Forbidden(c, "no permission")
 		return
 	}
-	items, err := h.repo.List(c.Request.Context(), cid, c.Query("keyword"))
+	archived := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("archived", "false")), "true")
+	items, err := h.repo.List(c.Request.Context(), cid, c.Query("keyword"), archived)
 	if err != nil {
 		response.Internal(c, "query customers failed")
 		return
@@ -126,4 +127,44 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"deleted": true})
+}
+
+func (h *Handler) Archive(c *gin.Context) {
+	uid, _ := middleware.GetCurrentUserID(c)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	old, err := h.repo.Get(c.Request.Context(), id)
+	if err != nil {
+		response.NotFound(c, "customer not found")
+		return
+	}
+	if !h.ensureMember(c, old.CalendarID, uid) {
+		response.Forbidden(c, "no permission")
+		return
+	}
+	out, err := h.repo.Archive(c.Request.Context(), id)
+	if err != nil {
+		response.Internal(c, "archive customer failed")
+		return
+	}
+	response.OK(c, out)
+}
+
+func (h *Handler) Unarchive(c *gin.Context) {
+	uid, _ := middleware.GetCurrentUserID(c)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	old, err := h.repo.Get(c.Request.Context(), id)
+	if err != nil {
+		response.NotFound(c, "customer not found")
+		return
+	}
+	if !h.ensureMember(c, old.CalendarID, uid) {
+		response.Forbidden(c, "no permission")
+		return
+	}
+	out, err := h.repo.Unarchive(c.Request.Context(), id)
+	if err != nil {
+		response.Internal(c, "unarchive customer failed")
+		return
+	}
+	response.OK(c, out)
 }
