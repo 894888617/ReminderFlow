@@ -182,20 +182,25 @@ export default function CustomerPage() {
   const showNoSearchResult = cid && !loading && !loadError && !!k.trim() && filteredCustomers.length === 0
   const showEmpty = cid && !loading && !loadError && !k.trim() && customerList.length === 0
 
+  const currentCountLabel = archivedMode ? '归档客户' : '客户数量'
+
   return <View className='customer-page'>
     <View className='safe-top' />
     <View className='customer-content-card'>
-      <Text
-        className='customer-table-text'
-        onClick={() => {
-          setArchivedMode((prev) => !prev)
-          setEditingCell(null)
-          setEditingValue('')
-        }}
-      >
-        {archivedMode ? '返回客户列表' : '查看归档'}
-      </Text>
-      <Input className='customer-search-input' placeholder='搜索姓名/手机号/备注' value={k} onInput={(e) => setK(e.detail.value)} onConfirm={load} />
+      <View className='customer-search-row'>
+        <Input className='customer-search-input' placeholder='搜索姓名/手机号/备注' value={k} onInput={(e) => setK(e.detail.value)} onConfirm={load} />
+        <Text
+          className='customer-archive-pill'
+          onClick={() => {
+            setArchivedMode((prev) => !prev)
+            setEditingCell(null)
+            setEditingValue('')
+          }}
+        >
+          {archivedMode ? '返回列表' : '查看归档'}
+        </Text>
+      </View>
+      {!loading && !loadError && cid ? <Text className='customer-mode-count'>{currentCountLabel}：{customerList.length}</Text> : null}
       {!cid ? <Text className='customer-empty'>请先选择日历空间</Text> : null}
       {cid && loading ? <Text className='customer-loading'>客户加载中...</Text> : null}
       {cid && !loading && !!loadError ? <Text className='customer-error'>{loadError}</Text> : null}

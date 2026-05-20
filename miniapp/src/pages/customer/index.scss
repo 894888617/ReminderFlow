@@ -20,13 +20,47 @@
   box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.08);
 }
 
+.customer-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
 .customer-search-input {
+  flex: 1;
   height: 72rpx;
+  min-width: 0;
   background: #f5f6fa;
   border-radius: 16rpx;
-  padding: 0 24rpx;
+  padding: 0 22rpx;
   color: #111827;
-  font-size: 28rpx;
+  font-size: 26rpx;
+  box-sizing: border-box;
+}
+
+.customer-archive-pill {
+  flex-shrink: 0;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: #eef2ff;
+  color: #2563eb;
+  font-size: 24rpx;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.customer-archive-pill:active {
+  opacity: 0.75;
+}
+
+.customer-mode-count {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #6b7280;
+  font-size: 24rpx;
 }
 
 .customer-table-card {
