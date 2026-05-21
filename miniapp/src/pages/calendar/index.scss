@@ -456,7 +456,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  justify-content: center;
+  gap: 12px;
 }
 
 .delete-status-btn {
@@ -487,8 +488,9 @@
 }
 
 .record-assignee-name {
-  max-width: 180px;
-  font-size: 23px;
+  flex-shrink: 0;
+  max-width: 150px;
+  font-size: 22px;
   color: #6b7280;
   line-height: 1.4;
   text-align: right;
@@ -634,6 +636,15 @@
 .timeline-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.timeline-main-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .status-pending,
@@ -670,9 +681,15 @@
 
 .history-link {
   display: inline-flex;
-  margin-top: 6px;
-  color: #1677ff;
-  font-size: 22px;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 21px;
   font-weight: 700;
 }
 
