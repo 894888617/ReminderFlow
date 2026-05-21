@@ -1,20 +1,3 @@
-.edit-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.back-btn {
-  flex-shrink: 0;
-  font-size: 24px;
-  color: #1677ff;
-  background: #eef5ff;
-  border-radius: 999px;
-  padding: 12px 20px;
-  margin-left: 16px;
-}
-
 .form-card {
   background: #ffffff;
   border-radius: 22px;
@@ -50,7 +33,7 @@
 
 .form-textarea {
   width: 100%;
-  min-height: 180px;
+  min-height: 100px;
   background: #f9fafb;
   border-radius: 16px;
   padding: 20px;
@@ -61,6 +44,7 @@
 
 .picker-value,
 .datetime-picker,
+.empty-calendar,
 .empty-member {
   background: #f9fafb;
   border-radius: 16px;
@@ -69,6 +53,7 @@
   color: #111827;
 }
 
+.empty-calendar,
 .empty-member {
   color: #9ca3af;
 }
@@ -79,7 +64,7 @@
   gap: 18px;
 }
 
-.clear-action {
+.clear-time {
   margin-top: 14px;
   font-size: 24px;
   color: #ef4444;
@@ -93,34 +78,124 @@
   text-align: center;
   font-size: 32px;
   font-weight: 800;
-  margin-bottom: 20px;
+  margin-bottom: 40px;
 }
 
 .submit-btn.disabled {
   background: #93c5fd;
 }
 
-.delete-btn {
-  background: #fef2f2;
-  color: #ef4444;
+.empty-calendar-guide {
+  background: #f9fafb;
   border-radius: 18px;
   padding: 24px;
-  text-align: center;
-  font-size: 30px;
+}
+
+.empty-calendar-title {
+  font-size: 28px;
   font-weight: 800;
-  margin-bottom: 40px;
+  color: #111827;
+  margin-bottom: 12px;
 }
 
-.delete-btn.disabled {
-  color: #fca5a5;
-}
-
-.readonly-tip {
-  background: #fffbeb;
-  color: #b45309;
-  border-radius: 18px;
-  padding: 20px 22px;
+.empty-calendar-desc {
   font-size: 24px;
+  color: #6b7280;
+  line-height: 1.6;
   margin-bottom: 20px;
-  line-height: 1.5;
+}
+
+.empty-calendar-btn {
+  background: #1677ff;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.compact-item {
+  margin-bottom: 22px;
+}
+
+.compact-checkbox {
+  margin-top: -4px;
+  margin-bottom: 22px;
+  font-size: 24px;
+  color: #4b5563;
+}
+
+.compact-checkbox checkbox {
+  transform: scale(0.9);
+  transform-origin: left center;
+}
+
+
+.clear-link {
+  margin-top: 10px;
+  font-size: 22px;
+  color: #9ca3af;
+}
+
+.customer-top-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.assignee-box-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.assignee-select-box {
+  height: 64px;
+  line-height: 64px;
+  padding: 0 20px;
+  background: #f5f6fa;
+  border-radius: 16px;
+  color: #111827;
+  font-size: 26px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignee-select-box.placeholder {
+  color: #9ca3af;
+}
+
+.assignee-clear {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  color: #9ca3af;
+  line-height: 1;
+  padding: 4px;
+}
+
+.customer-file-btn {
+  flex-shrink: 0;
+  height: 56px;
+  line-height: 56px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #2563eb;
+  font-size: 24px;
+  white-space: nowrap;
 }

@@ -1,480 +1,102 @@
-import { View, Text, Input, Textarea, Picker } from '@tarojs/components'
+import { View, Text, Input, Textarea, Picker, Checkbox, CheckboxGroup } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
-import {
-  deleteRecord,
-  getRecordDetail,
-  updateRecord,
-  updateRecordStatus,
-  type RecordItem,
-} from '../../api/record'
-import {
-  listCalendarMembers,
-  type CalendarMember,
-} from '../../api/calendar'
-import {
-  canEditRecord,
-  canDeleteRecord,
-} from '../../utils/permission'
-
+import { getRecordDetail, updateRecord, type RecordItem } from '../../api/record'
+import { listCalendarMembers, type CalendarMember } from '../../api/calendar'
+import { canEditRecord } from '../../utils/permission'
 import { getStoredToken } from '../../utils/auth'
 import { getUserNameDisplay } from '../../utils/userDisplay'
-import { normalizeRecordStatus, RECORD_STATUS_OPTIONS, type RecordStatus } from '../../utils/recordStatus'
+import { normalizeRecordStatus, type RecordStatus } from '../../utils/recordStatus'
+import { returnToCalendar, saveCalendarReturnContext } from '../../utils/calendarReturn'
 import './index.scss'
 
-function buildDateTime(date: string, time: string) {
-  if (!date || !time) return undefined
-  return `${date}T${time}:00+08:00`
-}
-
-function splitDateTime(value?: string | null) {
-  if (!value) {
-    return {
-      date: '',
-      time: '',
-    }
-  }
-
-  const normalized = value.replace('T', ' ')
-  return {
-    date: normalized.slice(0, 10),
-    time: normalized.slice(11, 16),
-  }
-}
-
-function todayDate() {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-function currentTime() {
-  const d = new Date()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh}:${mm}`
-}
+function buildDateTime(date: string, time = '00:00') { if (!date) return undefined; return `${date}T${time}:00+08:00` }
+function splitDateTime(value?: string | null) { if (!value) return { date: '', time: '' }; const n = value.replace('T', ' '); return { date: n.slice(0, 10), time: n.slice(11, 16) } }
 
 export default function RecordEditPage() {
-  const router = useRouter()
-  const recordId = Number(router.params.id || 0)
-
-  const currentUser = Taro.getStorageSync('user')
-  const currentUserId = Number(currentUser?.id || 0)
-
-
-  const [record, setRecord] = useState<RecordItem | null>(null)
-  const [members, setMembers] = useState<CalendarMember[]>([])
-
-  const role = record?.current_user_role || ''
-  const editable = canEditRecord(role)
-  const deletable = canDeleteRecord(role, currentUserId, record?.creator_id)
-
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [assigneeId, setAssigneeId] = useState<number | undefined>()
-  const [status, setStatus] = useState<RecordStatus>('PENDING')
-
-  const [appointmentDate, setAppointmentDate] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
-
+  const router = useRouter(); const recordId = Number(router.params.id || 0)
+  const [record, setRecord] = useState<RecordItem | null>(null); const [members, setMembers] = useState<CalendarMember[]>([])
+  const [title, setTitle] = useState(''); const [content, setContent] = useState(''); const [assigneeId, setAssigneeId] = useState<number | undefined>()
+  const [status, setStatus] = useState<RecordStatus>('PENDING'); const [appointmentDate, setAppointmentDate] = useState(''); const [startTime, setStartTime] = useState('')
+  const [customerId, setCustomerId] = useState<number | undefined>(); const [customerName, setCustomerName] = useState(''); const [customerPhone, setCustomerPhone] = useState(''); const [customerRemark, setCustomerRemark] = useState(''); const [projectName, setProjectName] = useState(''); const [saveToCustomer, setSaveToCustomer] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
-  const memberOptions = useMemo(() => {
-    return members.map((item) => ({
-      label: getUserNameDisplay(item),
-      value: item.user_id,
-    }))
-  }, [members])
-
-  const selectedAssigneeIndex = useMemo(() => {
-    if (!assigneeId) return -1
-    return memberOptions.findIndex((item) => item.value === assigneeId)
-  }, [memberOptions, assigneeId])
-
-  const selectedAssigneeName = useMemo(() => {
-    if (!assigneeId) return '未分配'
-    const selected = memberOptions.find((item) => item.value === assigneeId)
-    return selected?.label || '未分配'
-  }, [memberOptions, assigneeId])
-
-  const statusIndex = useMemo(() => {
-    return Math.max(0, RECORD_STATUS_OPTIONS.findIndex((item) => item.value === status))
-  }, [status])
+  const editable = canEditRecord(record?.current_user_role || '')
+  const memberOptions = useMemo(() => members.map((item) => ({ label: getUserNameDisplay(item), value: item.user_id })), [members])
+  const selectedAssigneeIndex = useMemo(() => !assigneeId ? -1 : memberOptions.findIndex((item) => item.value === assigneeId), [memberOptions, assigneeId])
+  const selectedAssigneeName = useMemo(() => !assigneeId ? '选择负责人' : (memberOptions.find((item) => item.value === assigneeId)?.label || '选择负责人'), [memberOptions, assigneeId])
+  const statusOptions = [{ label: '待处理', value: 'PENDING' }, { label: '已完成', value: 'COMPLETED' }, { label: '已取消', value: 'CANCELLED' }] as const
+  const statusIndex = Math.max(0, statusOptions.findIndex((item) => item.value === status))
 
   const loadData = async () => {
-    const token = getStoredToken()
-
-    if (!token) {
-      Taro.redirectTo({
-        url: '/pages/login/index',
-      })
-      return
-    }
-
-    if (!recordId) {
-      Taro.showToast({
-        title: '记录 ID 缺失',
-        icon: 'none',
-      })
-      return
-    }
-
+    const token = getStoredToken(); if (!token) { Taro.redirectTo({ url: '/pages/login/index' }); return }
+    if (!recordId) return
     try {
-      Taro.showLoading({
-        title: '加载中',
-        mask: true,
-      })
-
-      const detail = await getRecordDetail(recordId)
-      setRecord(detail)
-
-      setTitle(detail.title || '')
-      setContent(detail.content || '')
-      setAssigneeId(detail.assignee_id || undefined)
-      setStatus(normalizeRecordStatus(detail.status))
-
-      const start = splitDateTime(detail.calendar_start_at || detail.due_at)
-      const end = splitDateTime(detail.calendar_end_at)
-      setAppointmentDate(start.date)
-      setStartTime(start.time)
-      setEndTime(end.time)
-
-      const memberList = await listCalendarMembers(detail.calendar_id || detail.workspace_id || 0)
-      setMembers(memberList || [])
-    } catch (err) {
-      console.error(err)
-    } finally {
-      Taro.hideLoading()
+      const detail = await getRecordDetail(recordId); setRecord(detail)
+      setTitle(detail.title || ''); setContent(detail.content || ''); setAssigneeId(detail.assignee_id || undefined); setStatus(normalizeRecordStatus(detail.status))
+      const start = splitDateTime(detail.calendar_start_at || detail.due_at); setAppointmentDate(start.date); setStartTime(start.time)
+      setCustomerId(detail.customer_id || undefined); setCustomerName(detail.customer_name || ''); setCustomerPhone(detail.customer_phone || ''); setCustomerRemark(detail.customer_remark || ''); setProjectName(detail.project_name || detail.service_name || '')
+      setSaveToCustomer(false)
+      const memberList = await listCalendarMembers(detail.calendar_id || 0); setMembers(memberList || [])
+    } catch (err: any) {
+      console.error(err); Taro.showToast({ title: err?.statusCode === 404 ? '记录不存在或已被删除' : '记录加载失败，请稍后重试', icon: 'none' })
     }
   }
-
-  useDidShow(() => {
-    loadData()
-  })
+  useDidShow(loadData)
 
   const handleSubmit = async () => {
-    if (!editable) {
-      Taro.showToast({
-        title: '无编辑权限',
-        icon: 'none',
-      })
-      return
+    if (!editable || submitting || !record) return
+    setSubmitting(true)
+    const normalizedStatus = normalizeRecordStatus(status)
+    const payloadBase: any = {
+      calendar_id: record.calendar_id,
+      title: title.trim() || '预约记录',
+      customer_id: customerId ?? null,
+      customer_name: customerName.trim(),
+      customer_phone: customerPhone.trim(),
+      customer_remark: customerRemark.trim(),
+      save_customer_to_library: customerId ? false : saveToCustomer,
+      project_id: record.project_id || null,
+      project_name: projectName.trim(),
+      assignee_id: assigneeId,
+      appointment_date: appointmentDate || undefined,
+      start_time: startTime || undefined,
+      status: normalizedStatus,
+      content: content.trim(),
+      due_at: buildDateTime(appointmentDate, startTime),
+      calendar_start_at: buildDateTime(appointmentDate, startTime),
+      calendar_end_at: null,
+      calendar_all_day: !startTime,
     }
-
-    if (submitting) return
-
-    if (!recordId) {
-      Taro.showToast({
-        title: '记录 ID 缺失',
-        icon: 'none',
-      })
-      return
-    }
-
-    if (!title.trim()) {
-      Taro.showToast({
-        title: '请输入标题',
-        icon: 'none',
-      })
-      return
-    }
-
-    if ((appointmentDate && !startTime) || (!appointmentDate && startTime)) {
-      Taro.showToast({
-        title: '请完整选择预约日期和开始时间',
-        icon: 'none',
-      })
-      return
-    }
-
-    if (endTime && !startTime) {
-      Taro.showToast({
-        title: '请先选择开始时间',
-        icon: 'none',
-      })
-      return
-    }
-
-    if (startTime && endTime && endTime <= startTime) {
-      Taro.showToast({
-        title: '结束时间需晚于开始时间',
-        icon: 'none',
-      })
-      return
-    }
-
-    const calendarStartAt = buildDateTime(appointmentDate, startTime)
-    const calendarEndAt = endTime ? buildDateTime(appointmentDate, endTime) : undefined
-    const dueAt = calendarEndAt || calendarStartAt
-
     try {
-      setSubmitting(true)
-
-      Taro.showLoading({
-        title: '保存中',
-        mask: true,
-      })
-
-      await updateRecord(recordId, {
-        title: title.trim(),
-        content: content.trim(),
-        assignee_id: assigneeId,
-        due_at: dueAt,
-        calendar_start_at: calendarStartAt,
-        calendar_end_at: calendarEndAt || null,
-        calendar_all_day: false,
-      })
-
-      if (record && status !== normalizeRecordStatus(record.status)) {
-        await updateRecordStatus(recordId, status)
-      }
-
-      Taro.showToast({
-        title: '保存成功',
-        icon: 'success',
-      })
-
-      setTimeout(() => {
-        Taro.redirectTo({
-          url: `/pages/record-detail/index?id=${recordId}`,
-        })
-      }, 500)
-    } catch (err) {
+      await updateRecord(recordId, payloadBase)
+      Taro.showToast({ title: '保存成功', icon: 'success' })
+      saveCalendarReturnContext({ currentCalendarId: record.calendar_id, current_date: appointmentDate, selected_date: appointmentDate })
+      setTimeout(() => returnToCalendar({ currentCalendarId: record.calendar_id, currentDate: appointmentDate, selectedDate: appointmentDate }), 300)
+    } catch (err: any) {
       console.error(err)
-    } finally {
-      Taro.hideLoading()
-      setSubmitting(false)
-    }
-  }
-
-  const handleDelete = () => {
-    if (!recordId || deleting) return
-
-    if (!deletable) {
-      Taro.showToast({
-        title: '无删除权限',
-        icon: 'none',
-      })
-      return
-    }
-
-    Taro.showModal({
-      title: '确认删除记录',
-      content: '删除后不可恢复，确认继续吗？',
-      confirmText: '删除',
-      confirmColor: '#ef4444',
-      success: async (res) => {
-        if (!res.confirm) return
-
-        try {
-          setDeleting(true)
-
-          Taro.showLoading({
-            title: '删除中',
-            mask: true,
-          })
-
-          await deleteRecord(recordId)
-
-          Taro.hideLoading()
-
-          Taro.showToast({
-            title: '删除成功',
-            icon: 'success',
-          })
-
-          setTimeout(() => {
-            if (record?.calendar_id || record?.workspace_id) {
-              const targetCalendarId = record.calendar_id || record.workspace_id
-              Taro.redirectTo({
-                url: `/pages/calendar/index?calendar_id=${targetCalendarId}`,
-              })
-            } else {
-              Taro.redirectTo({
-                url: '/pages/calendar/index',
-              })
-            }
-          }, 500)
-        } catch (err) {
-          console.error(err)
-          Taro.hideLoading()
-        } finally {
-          setDeleting(false)
+      if (err?.code === 'CUSTOMER_PHONE_EXISTS') {
+        const customer = err?.customer || {}
+        const modal = await Taro.showModal({ title: '手机号重复', content: '该手机号客户已存在，是否使用已有客户信息？', confirmText: '使用已有客户', cancelText: '不使用' })
+        if (modal.confirm) {
+          await updateRecord(recordId, { ...payloadBase, customer_id: Number(customer.id || 0) || null, customer_name: customer.name || customerName.trim(), customer_phone: customer.phone || customerPhone.trim(), customer_remark: customer.remark || customerRemark.trim(), save_customer_to_library: false })
+          Taro.showToast({ title: '保存成功', icon: 'success' })
+          setTimeout(() => returnToCalendar({ currentCalendarId: record.calendar_id, currentDate: appointmentDate, selectedDate: appointmentDate }), 300)
         }
-      },
-    })
+      } else { Taro.showToast({ title: '保存失败，请稍后重试', icon: 'none' }) }
+    } finally { setSubmitting(false) }
   }
 
-  return (
-    <View className='container'>
-      <View className='edit-header'>
-        <View
-          className='back-btn'
-          onClick={() => {
-            Taro.navigateBack()
-          }}
-        >
-          返回
-        </View>
-      </View>
-
-      {!editable && (
-        <View className='readonly-tip'>
-          当前角色无编辑权限，仅可查看记录。
-        </View>
-      )}
-
-      <View className='form-card'>
-
-        <View className='form-item'>
-          <Text className='form-label'>标题</Text>
-          <Input
-            className='form-input'
-            value={title}
-            placeholder='请输入记录标题'
-            maxlength={200}
-            onInput={(e) => setTitle(e.detail.value)}
-          />
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>内容</Text>
-          <Textarea
-            className='form-textarea'
-            value={content}
-            placeholder='补充说明、处理要求、注意事项等'
-            maxlength={1000}
-            onInput={(e) => setContent(e.detail.value)}
-          />
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>负责人</Text>
-
-          {memberOptions.length === 0 ? (
-            <View className='empty-member'>暂无成员可选</View>
-          ) : (
-            <Picker
-              mode='selector'
-              range={memberOptions.map((item) => item.label)}
-              value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0}
-              onChange={(e) => {
-                const index = Number(e.detail.value)
-                const selected = memberOptions[index]
-                if (selected) {
-                  setAssigneeId(selected.value)
-                }
-              }}
-            >
-              <View className='picker-value'>
-                {selectedAssigneeName}
-              </View>
-            </Picker>
-          )}
-
-          {assigneeId && (
-            <View
-              className='clear-action'
-              onClick={() => {
-                setAssigneeId(undefined)
-              }}
-            >
-              清除负责人
-            </View>
-          )}
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>状态</Text>
-          <Picker
-            mode='selector'
-            range={RECORD_STATUS_OPTIONS.map((item) => item.label)}
-            value={statusIndex}
-            onChange={(e) => {
-              const nextStatus = RECORD_STATUS_OPTIONS[Number(e.detail.value)]?.value
-              if (nextStatus) setStatus(nextStatus)
-            }}
-          >
-            <View className='picker-value'>
-              {RECORD_STATUS_OPTIONS[statusIndex].label}
-            </View>
-          </Picker>
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>预约日期</Text>
-          <Picker
-            mode='date'
-            value={appointmentDate || todayDate()}
-            onChange={(e) => setAppointmentDate(String(e.detail.value))}
-          >
-            <View className='datetime-picker'>
-              {appointmentDate || '选择预约日期'}
-            </View>
-          </Picker>
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>开始时间</Text>
-          <Picker
-            mode='time'
-            value={startTime || currentTime()}
-            onChange={(e) => setStartTime(String(e.detail.value))}
-          >
-            <View className='datetime-picker'>
-              {startTime || '选择开始时间'}
-            </View>
-          </Picker>
-        </View>
-
-        <View className='form-item'>
-          <Text className='form-label'>结束时间</Text>
-          <Picker
-            mode='time'
-            value={endTime || currentTime()}
-            onChange={(e) => setEndTime(String(e.detail.value))}
-          >
-            <View className='datetime-picker'>
-              {endTime || '选择结束时间'}
-            </View>
-          </Picker>
-
-          {(appointmentDate || startTime || endTime) && (
-            <View
-              className='clear-action'
-              onClick={() => {
-                setAppointmentDate('')
-                setStartTime('')
-                setEndTime('')
-              }}
-            >
-              清除预约时间
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View
-        className={submitting ? 'submit-btn disabled' : 'submit-btn'}
-        onClick={handleSubmit}
-      >
-        {submitting ? '保存中...' : '保存修改'}
-      </View>
-
-      {deletable && (
-        <View
-          className={deleting ? 'delete-btn disabled' : 'delete-btn'}
-          onClick={handleDelete}
-        >
-          {deleting ? '删除中...' : '删除记录'}
-        </View>
-      )}
-    </View>
-  )
+  return <View className='container'><View className='form-card'>
+    <View className='customer-top-row'><View className='assignee-box-wrap'>{memberOptions.length === 0 ? <View className='assignee-select-box placeholder'>暂无成员可选</View> : <Picker mode='selector' range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => { const selected = memberOptions[Number(e.detail.value)]; if (selected) setAssigneeId(selected.value) }}><View className={assigneeId ? 'assignee-select-box' : 'assignee-select-box placeholder'}>{selectedAssigneeName}</View></Picker>}{assigneeId ? <View className='assignee-clear' onClick={() => setAssigneeId(undefined)}>×</View> : null}</View>
+      <View className='customer-file-btn' onClick={() => { if (!record?.calendar_id) return; const eventChannel = Taro.navigateTo({ url: `/pages/customer/select?calendar_id=${record.calendar_id}` } as any); Promise.resolve(eventChannel).then((res: any) => { res?.eventChannel?.on?.('customerSelected', (payload: any) => { setCustomerId(Number(payload?.customer_id || 0) || undefined); setCustomerName(payload?.customer_name || ''); setCustomerPhone(payload?.customer_phone || ''); setCustomerRemark(payload?.customer_remark || ''); setSaveToCustomer(false) }) }) }}>客户档案</View></View>
+    <View className='form-item'><Text className='form-label'>标题</Text><Input className='form-input' value={title} onInput={(e) => setTitle(e.detail.value)} maxlength={200} /></View>
+    <View className='grid-two'><View className='form-item compact-item'><Text className='form-label'>客户姓名</Text><Input className='form-input' value={customerName} onInput={(e) => setCustomerName(e.detail.value)} /></View><View className='form-item compact-item'><Text className='form-label'>客户手机号</Text><Input className='form-input' value={customerPhone} onInput={(e) => setCustomerPhone(e.detail.value)} /></View></View>
+    <View className='grid-two'><View className='form-item compact-item'><Text className='form-label'>服务项目</Text><Input className='form-input' value={projectName} onInput={(e) => setProjectName(e.detail.value)} /></View><View className='form-item compact-item'><Text className='form-label'>客户备注</Text><Input className='form-input' value={customerRemark} onInput={(e) => setCustomerRemark(e.detail.value)} /></View></View>
+    {customerId ? null : <View className='form-item compact-checkbox'><CheckboxGroup onChange={(e) => setSaveToCustomer((e.detail.value || []).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
+    <View className='grid-two'><View className='form-item compact-item'><Text className='form-label'>预约日期</Text><Picker mode='date' value={appointmentDate} onChange={(e) => setAppointmentDate(String(e.detail.value))}><View className='datetime-picker'>{appointmentDate || '选择预约日期'}</View></Picker></View><View className='form-item compact-item'><Text className='form-label'>开始时间（可选）</Text><Picker mode='time' value={startTime || '10:00'} onChange={(e) => setStartTime(String(e.detail.value))}><View className='datetime-picker'>{startTime || '选择开始时间'}</View></Picker></View></View>
+    <View className='form-item'><Text className='form-label'>状态</Text><Picker mode='selector' range={statusOptions.map((i) => i.label)} value={statusIndex} onChange={(e) => setStatus(statusOptions[Number(e.detail.value)]?.value || 'PENDING')}><View className='picker-value'>{statusOptions[statusIndex].label}</View></Picker></View>
+    <View className='form-item'><Text className='form-label'>备注</Text><Textarea className='form-textarea' value={content} onInput={(e) => setContent(e.detail.value)} maxlength={1000} /></View>
+  </View><View className={submitting ? 'submit-btn disabled' : 'submit-btn'} onClick={handleSubmit}>{submitting ? '保存中...' : '保存修改'}</View></View>
 }
