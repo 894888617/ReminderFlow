@@ -212,7 +212,7 @@ function getEventTitle(event: CalendarEvent) {
 }
 
 function getEventRemark(event: CalendarEvent) {
-  return event.remark || event.content || event.record_content || "";
+  return event.record_content || event.content || event.remark || "";
 }
 
 function hasCustomerInfo(event: CalendarEvent) {
@@ -779,11 +779,23 @@ export default function CalendarPage() {
               {getEventRemark(item) ? (
                 <View className="record-remark">{getEventRemark(item)}</View>
               ) : null}
+            </View>
+            <View className="timeline-actions">
               {!isSpecialEvent(item) ? (
                 <View className="record-assignee-name">
                   {item.assignee_name || "未分配"}
                 </View>
               ) : null}
+              <View
+                className={`record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
+                onClick={(event) => {
+                  if (!item.record_id) return;
+                  event.stopPropagation();
+                  handleChangeRecordStatus(item);
+                }}
+              >
+                {getStatusText(item.status, item.event_type)}
+              </View>
               {item.record_id && hasCustomerInfo(item) ? (
                 <View
                   className="history-link"
@@ -799,18 +811,6 @@ export default function CalendarPage() {
                   客户历史
                 </View>
               ) : null}
-            </View>
-            <View className="timeline-actions">
-              <View
-                className={`record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
-                onClick={(event) => {
-                  if (!item.record_id) return;
-                  event.stopPropagation();
-                  handleChangeRecordStatus(item);
-                }}
-              >
-                {getStatusText(item.status, item.event_type)}
-              </View>
               {isSpecialEvent(item) && writable ? (
                 <View
                   className="delete-status-btn"

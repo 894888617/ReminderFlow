@@ -61,7 +61,6 @@ export default function RecordCreatePage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
-  const [customerRemark, setCustomerRemark] = useState("");
   const [customerId, setCustomerId] = useState<number | undefined>();
   const [saveToCustomer, setSaveToCustomer] = useState(true);
   const [title, setTitle] = useState("");
@@ -224,14 +223,7 @@ export default function RecordCreatePage() {
     const buildPayload = (overrides?: Partial<any>) => ({
       calendar_id: calendarId,
       title: finalTitle,
-      content: [
-        customerName.trim() ? `客户：${customerName.trim()}` : "",
-        customerPhone.trim() ? `电话：${customerPhone.trim()}` : "",
-        serviceName.trim() ? `项目：${serviceName.trim()}` : "",
-        content.trim(),
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      content: content.trim(),
       assignee_id: assigneeId,
       due_at: calendarStartAt,
       start_time: calendarStartAt,
@@ -243,7 +235,7 @@ export default function RecordCreatePage() {
       customer_id: customerId ?? null,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim(),
-      customer_remark: customerRemark.trim(),
+      customer_remark: null,
       save_customer_to_library: customerId ? false : saveToCustomer,
       project_id: null,
       project_name: serviceName.trim(),
@@ -308,7 +300,7 @@ export default function RecordCreatePage() {
             customer_id: existingCustomerId ?? null,
             customer_name: customer.name || customerName.trim(),
             customer_phone: customer.phone || customerPhone.trim(),
-            customer_remark: customer.remark || customerRemark.trim(),
+            customer_remark: null,
             save_customer_to_library: false,
           })
           : buildPayload({
@@ -327,7 +319,6 @@ export default function RecordCreatePage() {
           setCustomerId(existingCustomerId);
           setCustomerName(customer.name || customerName);
           setCustomerPhone(customer.phone || customerPhone);
-          setCustomerRemark(customer.remark || customerRemark);
         } else {
           setCustomerId(undefined);
         }
@@ -373,19 +364,8 @@ export default function RecordCreatePage() {
           </View>
         ) : null}
 
-        <View className="customer-top-row">
-          <View className="assignee-box-wrap">
-            {memberOptions.length === 0 ? (
-              <View className="assignee-select-box placeholder">暂无成员可选</View>
-            ) : (
-              <Picker mode="selector" range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => {
-                const index = Number(e.detail.value);
-                const selected = memberOptions[index];
-                if (selected) setAssigneeId(selected.value);
-              }}><View className={assigneeId ? "assignee-select-box" : "assignee-select-box placeholder"}>{selectedAssigneeName}</View></Picker>
-            )}
-            {assigneeId ? <View className="assignee-clear" onClick={() => setAssigneeId(undefined)}>×</View> : null}
-          </View>
+        <View className="title-row">
+          <Text className="form-label no-margin">标题</Text>
           <View className="customer-file-btn" onClick={() => {
             if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
             const url = `/pages/customer/select?calendar_id=${calendarId}`
@@ -395,7 +375,6 @@ export default function RecordCreatePage() {
                 setCustomerId(Number(payload?.customer_id || 0) || undefined)
                 setCustomerName(payload?.customer_name || '')
                 setCustomerPhone(payload?.customer_phone || '')
-                setCustomerRemark(payload?.customer_remark || '')
                 setSaveToCustomer(false)
               })
             })
@@ -403,7 +382,6 @@ export default function RecordCreatePage() {
         </View>
 
         <View className="form-item">
-          <Text className="form-label">标题</Text>
           <Input className="form-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
         </View>
 
@@ -414,7 +392,18 @@ export default function RecordCreatePage() {
 
         <View className="grid-two">
           <View className="form-item compact-item"><Text className="form-label">服务项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
-          <View className="form-item compact-item"><Text className="form-label">客户备注</Text><Input className="form-input" value={customerRemark} maxlength={255} onInput={(e) => setCustomerRemark(e.detail.value)} /></View>
+          <View className="form-item compact-item"><Text className="form-label">负责人</Text><View className="assignee-box-wrap">
+            {memberOptions.length === 0 ? (
+              <View className="assignee-select-box placeholder">暂无成员可选</View>
+            ) : (
+              <Picker mode="selector" range={memberOptions.map((item) => item.label)} value={selectedAssigneeIndex >= 0 ? selectedAssigneeIndex : 0} onChange={(e) => {
+                const index = Number(e.detail.value);
+                const selected = memberOptions[index];
+                if (selected) setAssigneeId(selected.value);
+              }}><View className={assigneeId ? "assignee-select-box" : "assignee-select-box placeholder"}>{selectedAssigneeName}</View></Picker>
+            )}
+            {assigneeId ? <View className="assignee-clear" onClick={() => setAssigneeId(undefined)}>×</View> : null}
+          </View></View>
         </View>
 
         {customerId ? null : <View className="form-item compact-checkbox"><CheckboxGroup onChange={(e) => setSaveToCustomer((e.detail.value || []).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}

@@ -87,11 +87,10 @@ export default function RecordDetailPage() {
 
         <View className='record-detail-row'>
           <View className='record-detail-item'><Text className='record-detail-label'>服务项目</Text><Text className='record-detail-value'>{getText(record.project_name || record.service_name)}</Text></View>
-          <View className='record-detail-item'><Text className='record-detail-label'>客户备注</Text><Text className='record-detail-value'>{getText(record.customer_remark)}</Text></View>
+          <View className='record-detail-item'><Text className='record-detail-label'>负责人</Text><Text className='record-detail-value'>{getText(record.assignee_name, '未分配')}</Text></View>
         </View>
 
         <View className='record-detail-row'>
-          <View className='record-detail-item'><Text className='record-detail-label'>负责人</Text><Text className='record-detail-value'>{getText(record.assignee_name, '未分配')}</Text></View>
           <View className='record-detail-item'><Text className='record-detail-label'>状态</Text><Text className='record-status-pill'>{getRecordStatusText(normalizedStatus)}</Text></View>
         </View>
 
