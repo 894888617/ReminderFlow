@@ -775,17 +775,19 @@ export default function CalendarPage() {
           >
             <View className="timeline-time">{getEventTime(item)}</View>
             <View className="timeline-main">
-              <View className="record-title">{getEventTitle(item)}</View>
-              {getEventRemark(item) ? (
-                <View className="record-remark">{getEventRemark(item)}</View>
-              ) : null}
-            </View>
-            <View className="timeline-actions">
+              <View className="timeline-main-content">
+                <View className="record-title">{getEventTitle(item)}</View>
+                {getEventRemark(item) ? (
+                  <View className="record-remark">{getEventRemark(item)}</View>
+                ) : null}
+              </View>
               {!isSpecialEvent(item) ? (
                 <View className="record-assignee-name">
                   {item.assignee_name || "未分配"}
                 </View>
               ) : null}
+            </View>
+            <View className="timeline-actions">
               <View
                 className={`record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
                 onClick={(event) => {

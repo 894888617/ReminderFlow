@@ -42,6 +42,18 @@ export default function CustomerSelectPage() {
     return `${i.name || ''}${i.phone || ''}${i.remark || ''}`.toLowerCase().includes(keyword)
   }), [list, keyword])
 
+  const handleSelectCustomer = (customer: Customer) => {
+    const ch = (getCurrentPages().slice(-2)[0] as any)
+    const evt = ch?.getOpenerEventChannel?.()
+    evt?.emit('customerSelected', {
+      customer_id: customer.id,
+      customer_name: customer.name || '',
+      customer_phone: customer.phone || '',
+      customer_remark: customer.remark || '',
+    })
+    Taro.navigateBack()
+  }
+
   return <View className='customer-select-page'>
     <View className='safe-top' />
     <View className='customer-select-card'>
@@ -50,23 +62,31 @@ export default function CustomerSelectPage() {
       {cid && loading ? <Text className='customer-select-loading'>客户加载中...</Text> : null}
       {cid && !loading && !!loadError ? <Text className='customer-select-error'>{loadError}</Text> : null}
       {cid && !loading && !loadError && !filtered[0] ? <Text className='customer-select-empty'>暂无客户档案，可手动填写客户信息</Text> : null}
-      <View className='customer-select-list'>
-        {(filtered || []).map(i => <View className='customer-select-item' key={i.id} onClick={() => {
-          const ch = (getCurrentPages().slice(-2)[0] as any)
-          const evt = ch?.getOpenerEventChannel?.()
-          evt?.emit('customerSelected', {
-            customer_id: i.id,
-            customer_name: i.name || '',
-            customer_phone: i.phone || '',
-            customer_remark: i.remark || '',
-          })
-          Taro.navigateBack()
-        }}>
-          <Text>{i.name || '-'}</Text>
-          <Text>{i.phone || ''}</Text>
-          <Text>{i.remark || ''}</Text>
-        </View>)}
-      </View>
+
+      {cid && !loading && !loadError && filtered.length > 0 ? (
+        <View className='customer-select-table-card'>
+          <View className='customer-select-table'>
+            <View className='customer-select-header'>
+              <Text className='customer-select-cell'>姓名</Text>
+              <Text className='customer-select-cell'>手机号</Text>
+              <Text className='customer-select-cell'>备注</Text>
+              <Text className='customer-select-cell'>操作</Text>
+            </View>
+            <View className='customer-select-body'>
+              {filtered.map(i => (
+                <View className='customer-select-row' key={i.id}>
+                  <Text className='customer-select-cell'>{i.name || '-'}</Text>
+                  <Text className='customer-select-cell customer-select-phone'>{i.phone || '-'}</Text>
+                  <Text className='customer-select-cell customer-select-remark'>{i.remark || '-'}</Text>
+                  <View className='customer-select-cell'>
+                    <Text className='customer-select-action-btn' onClick={() => handleSelectCustomer(i)}>选择</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   </View>
 }

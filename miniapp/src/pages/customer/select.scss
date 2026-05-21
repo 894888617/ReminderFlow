@@ -45,18 +45,59 @@
   color: #dc2626;
 }
 
-.customer-select-list {
+.customer-select-table-card {
   margin-top: 24rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  border: 1rpx solid #e5e7eb;
 }
 
-.customer-select-item {
-  padding: 20rpx;
-  border: 1rpx solid #eee;
-  border-radius: 14rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-  color: #222;
-  background: #fff;
-  margin-bottom: 12rpx;
+.customer-select-table {
+  width: 100%;
+}
+
+.customer-select-header,
+.customer-select-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 128rpx;
+  align-items: center;
+}
+
+.customer-select-header {
+  background: #f8fafc;
+}
+
+.customer-select-row {
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.customer-select-cell {
+  min-width: 0;
+  padding: 20rpx 14rpx;
+  font-size: 24rpx;
+  color: #111827;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.customer-select-phone {
+  color: #374151;
+}
+
+.customer-select-remark {
+  color: #6b7280;
+}
+
+.customer-select-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 22rpx;
+  font-weight: 700;
 }
