@@ -81,12 +81,12 @@ export default function RecordDetailPage() {
         <View className='title'>{getText(record.title)}</View>
 
         <View className='record-detail-row'>
-          <View className='record-detail-item'><Text className='record-detail-label'>客户姓名</Text><Text className='record-detail-value'>{getText(record.customer_name)}</Text></View>
-          <View className='record-detail-item'><Text className='record-detail-label'>客户手机号</Text><Text className='record-detail-value'>{getText(record.customer_phone)}</Text></View>
+          <View className='record-detail-item'><Text className='record-detail-label'>姓名</Text><Text className='record-detail-value'>{getText(record.customer_name)}</Text></View>
+          <View className='record-detail-item'><Text className='record-detail-label'>手机号</Text><Text className='record-detail-value'>{getText(record.customer_phone)}</Text></View>
         </View>
 
         <View className='record-detail-row'>
-          <View className='record-detail-item'><Text className='record-detail-label'>服务项目</Text><Text className='record-detail-value'>{getText(record.project_name || record.service_name)}</Text></View>
+          <View className='record-detail-item'><Text className='record-detail-label'>项目</Text><Text className='record-detail-value'>{getText(record.project_name || record.service_name)}</Text></View>
           <View className='record-detail-item'><Text className='record-detail-label'>负责人</Text><Text className='record-detail-value'>{getText(record.assignee_name, '未分配')}</Text></View>
         </View>
 

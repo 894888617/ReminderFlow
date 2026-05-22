@@ -411,16 +411,16 @@ export default function RecordCreatePage() {
 
         <View className="form-row two-col">
           <View className="form-col">
-            <View className="form-item compact-item"><Text className="form-label">客户姓名</Text><Input className="form-input" value={customerName} maxlength={128} onInput={(e) => setCustomerName(e.detail.value)} /></View>
+            <View className="form-item compact-item"><Text className="form-label">姓名</Text><Input className="form-input" value={customerName} maxlength={128} onInput={(e) => setCustomerName(e.detail.value)} /></View>
           </View>
           <View className="form-col">
-            <View className="form-item compact-item"><Text className="form-label">客户手机号</Text><Input className="form-input" value={customerPhone} maxlength={32} onInput={(e) => setCustomerPhone(e.detail.value)} /></View>
+            <View className="form-item compact-item"><Text className="form-label">手机号</Text><Input className="form-input" value={customerPhone} maxlength={32} onInput={(e) => setCustomerPhone(e.detail.value)} /></View>
           </View>
         </View>
 
         <View className="form-row two-col">
           <View className="form-col">
-            <View className="form-item compact-item"><Text className="form-label">服务项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
+            <View className="form-item compact-item"><Text className="form-label">项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
           </View>
           <View className="form-col">
             <View className="form-item compact-item"><Text className="form-label">负责人</Text><View className="assignee-box-wrap">
