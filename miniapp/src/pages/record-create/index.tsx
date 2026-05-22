@@ -364,7 +364,7 @@ export default function RecordCreatePage() {
           </View>
         ) : null}
 
-        <View className="record-title-row">
+        <View className="title-row">
           <Text className="form-label no-margin">标题</Text>
           <View className="customer-file-btn" onClick={() => {
             if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
@@ -382,7 +382,7 @@ export default function RecordCreatePage() {
         </View>
 
         <View className="form-item">
-          <Input className="form-input title-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
+          <Input className="form-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
         </View>
 
         <View className="grid-two">
