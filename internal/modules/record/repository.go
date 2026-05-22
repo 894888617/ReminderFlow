@@ -161,8 +161,11 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	}
 
 	if params.ProjectName != "" {
-		if err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, params.ProjectName, params.CreatorID); err != nil {
+		projectID, err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, params.ProjectName, params.CreatorID)
+		if err != nil {
 			log.Printf("[record.create] upsert appointment project failed: calendar_id=%d project_name=%q err=%v", params.CalendarID, params.ProjectName, err)
+		} else if params.ProjectID == nil {
+			params.ProjectID = &projectID
 		}
 	}
 
@@ -277,14 +280,16 @@ func (r *Repository) Create(ctx context.Context, params CreateRecordParams) (*Re
 	return &rec, nil
 }
 
-func (r *Repository) upsertAppointmentProject(ctx context.Context, tx pgx.Tx, calendarID int64, projectName string, userID int64) error {
-	_, err := tx.Exec(ctx, `
+func (r *Repository) upsertAppointmentProject(ctx context.Context, tx pgx.Tx, calendarID int64, projectName string, userID int64) (int64, error) {
+	var projectID int64
+	err := tx.QueryRow(ctx, `
 		INSERT INTO appointment_projects (calendar_id, name, usage_count, last_used_at, created_by)
 		VALUES ($1, $2, 1, NOW(), $3)
 		ON CONFLICT (calendar_id, name) WHERE deleted_at IS NULL
 		DO UPDATE SET usage_count = appointment_projects.usage_count + 1, last_used_at = NOW(), updated_at = NOW()
-	`, calendarID, projectName, userID)
-	return err
+		RETURNING id
+	`, calendarID, projectName, userID).Scan(&projectID)
+	return projectID, err
 }
 
 func shouldCheckScheduleConflict(calendarID int64, assigneeID *int64, startAt *time.Time, endAt *time.Time, allDay bool, status string) bool {
@@ -738,10 +743,13 @@ func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Re
 		return nil, err
 	}
 
-
 	if strings.TrimSpace(params.ProjectName) != "" {
-		if err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, strings.TrimSpace(params.ProjectName), params.UpdatedBy); err != nil {
+		projectID, err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, strings.TrimSpace(params.ProjectName), params.UpdatedBy)
+		if err != nil {
 			log.Printf("[record.update] upsert appointment project failed: calendar_id=%d project_name=%q err=%v", params.CalendarID, params.ProjectName, err)
+		} else if params.ProjectID == nil {
+			params.ProjectID = &projectID
+			_, _ = tx.Exec(ctx, `UPDATE records SET project_id=$2 WHERE id=$1`, params.ID, params.ProjectID)
 		}
 	}
 
