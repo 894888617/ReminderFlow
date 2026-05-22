@@ -1,4 +1,4 @@
-import { View, Text, Input, Textarea, Picker, Checkbox, CheckboxGroup } from "@tarojs/components";
+import { View, Text, Input, Textarea, Picker, Checkbox, CheckboxGroup, Button } from "@tarojs/components";
 import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 
@@ -350,8 +350,8 @@ export default function RecordCreatePage() {
   };
 
   return (
-    <View className="container">
-      <View className="form-card">
+    <View className="record-form-page">
+      <View className="record-form-card">
         {calendars.length === 0 ? (
           <View className="form-item">
             <View className="empty-calendar-guide">
@@ -364,7 +364,7 @@ export default function RecordCreatePage() {
           </View>
         ) : null}
 
-        <View className="title-row">
+        <View className="record-title-row">
           <Text className="form-label no-margin">标题</Text>
           <View className="customer-file-btn" onClick={() => {
             if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
@@ -385,14 +385,21 @@ export default function RecordCreatePage() {
           <Input className="form-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
         </View>
 
-        <View className="grid-two">
-          <View className="form-item compact-item"><Text className="form-label">客户姓名</Text><Input className="form-input" value={customerName} maxlength={128} onInput={(e) => setCustomerName(e.detail.value)} /></View>
-          <View className="form-item compact-item"><Text className="form-label">客户手机号</Text><Input className="form-input" value={customerPhone} maxlength={32} onInput={(e) => setCustomerPhone(e.detail.value)} /></View>
+        <View className="form-row two-col">
+          <View className="form-col">
+            <View className="form-item compact-item"><Text className="form-label">客户姓名</Text><Input className="form-input" value={customerName} maxlength={128} onInput={(e) => setCustomerName(e.detail.value)} /></View>
+          </View>
+          <View className="form-col">
+            <View className="form-item compact-item"><Text className="form-label">客户手机号</Text><Input className="form-input" value={customerPhone} maxlength={32} onInput={(e) => setCustomerPhone(e.detail.value)} /></View>
+          </View>
         </View>
 
-        <View className="grid-two">
-          <View className="form-item compact-item"><Text className="form-label">服务项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
-          <View className="form-item compact-item"><Text className="form-label">负责人</Text><View className="assignee-box-wrap">
+        <View className="form-row two-col">
+          <View className="form-col">
+            <View className="form-item compact-item"><Text className="form-label">服务项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
+          </View>
+          <View className="form-col">
+            <View className="form-item compact-item"><Text className="form-label">负责人</Text><View className="assignee-box-wrap">
             {memberOptions.length === 0 ? (
               <View className="assignee-select-box placeholder">暂无成员可选</View>
             ) : (
@@ -404,11 +411,12 @@ export default function RecordCreatePage() {
             )}
             {assigneeId ? <View className="assignee-clear" onClick={() => setAssigneeId(undefined)}>×</View> : null}
           </View></View>
+          </View>
         </View>
 
-        {customerId ? null : <View className="form-item compact-checkbox"><CheckboxGroup onChange={(e) => setSaveToCustomer((e.detail.value || []).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
+        {customerId ? null : <View className="save-customer-row"><CheckboxGroup onChange={(e) => setSaveToCustomer((e.detail.value || []).includes('1'))}><Checkbox value='1' checked={saveToCustomer}>保存到客户库</Checkbox></CheckboxGroup></View>}
 
-        <View className="grid-two">
+        <View className="form-row two-col">
           <View className="form-item compact-item"><Text className="form-label">预约日期</Text><Picker mode="date" value={appointmentDate} onChange={(e) => setAppointmentDate(String(e.detail.value))}><View className="datetime-picker">{appointmentDate}</View></Picker></View>
           <View className="form-item compact-item"><Text className="form-label">开始时间（可选）</Text><Picker mode="time" value={startTime || "10:00"} onChange={(e) => setStartTime(String(e.detail.value))}><View className="datetime-picker">{startTime || "选择开始时间"}</View></Picker>{startTime ? (<View className="clear-link" onClick={() => setStartTime("")}>清除开始时间</View>) : null}</View>
         </View>
@@ -419,11 +427,10 @@ export default function RecordCreatePage() {
         </View>
       </View>
 
-      <View
-        className={submitting ? "submit-btn disabled" : "submit-btn"}
-        onClick={handleSubmit}
-      >
-        {submitting ? "创建中..." : "创建预约"}
+      <View className="record-submit-bar">
+        <Button className="record-submit-btn" disabled={submitting || calendars.length === 0} onClick={handleSubmit}>
+          {submitting ? "创建中..." : "创建预约"}
+        </Button>
       </View>
     </View>
   );

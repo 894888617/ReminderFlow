@@ -1,212 +1,68 @@
-.form-card {
-  background: #ffffff;
-  border-radius: 22px;
-  padding: 28px 24px;
-  margin-bottom: 28px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
-}
-
-.form-item {
-  margin-bottom: 30px;
-}
-
-.form-item:last-child {
-  margin-bottom: 0;
-}
-
-.form-label {
-  display: block;
-  font-size: 26px;
-  font-weight: 700;
-  color: #374151;
-  margin-bottom: 14px;
-}
-
-.form-input {
-  height: 76px;
-  background: #f9fafb;
-  border-radius: 16px;
-  padding: 0 20px;
-  font-size: 28px;
-  color: #111827;
-}
-
-.form-textarea {
-  width: 100%;
-  min-height: 100px;
-  background: #f9fafb;
-  border-radius: 16px;
-  padding: 20px;
-  font-size: 28px;
-  color: #111827;
+.record-form-page {
+  min-height: 100vh;
   box-sizing: border-box;
-}
-
-.picker-value,
-.datetime-picker,
-.empty-calendar,
-.empty-member {
-  background: #f9fafb;
-  border-radius: 16px;
-  padding: 22px 20px;
-  font-size: 28px;
-  color: #111827;
-}
-
-.empty-calendar,
-.empty-member {
-  color: #9ca3af;
-}
-
-.datetime-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.clear-time {
-  margin-top: 14px;
-  font-size: 24px;
-  color: #ef4444;
-}
-
-.submit-btn {
-  background: #1677ff;
-  color: #ffffff;
-  border-radius: 18px;
-  padding: 26px 24px;
-  text-align: center;
-  font-size: 32px;
-  font-weight: 800;
-  margin-bottom: 40px;
-}
-
-.submit-btn.disabled {
-  background: #93c5fd;
-}
-
-.empty-calendar-guide {
-  background: #f9fafb;
-  border-radius: 18px;
-  padding: 24px;
-}
-
-.empty-calendar-title {
-  font-size: 28px;
-  font-weight: 800;
-  color: #111827;
-  margin-bottom: 12px;
-}
-
-.empty-calendar-desc {
-  font-size: 24px;
-  color: #6b7280;
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-
-.empty-calendar-btn {
-  background: #1677ff;
-  color: #ffffff;
-  border-radius: 16px;
-  padding: 20px 24px;
-  text-align: center;
-  font-size: 26px;
-  font-weight: 800;
-}
-
-
-
-.grid-two {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.compact-item {
-  margin-bottom: 22px;
-}
-
-.compact-checkbox {
-  margin-top: -4px;
-  margin-bottom: 22px;
-  font-size: 24px;
-  color: #4b5563;
-}
-
-.compact-checkbox checkbox {
-  transform: scale(0.9);
-  transform-origin: left center;
-}
-
-
-.clear-link {
-  margin-top: 10px;
-  font-size: 22px;
-  color: #9ca3af;
-}
-
-.customer-top-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.form-label.no-margin {
-  margin-bottom: 0;
-}
-
-.assignee-box-wrap {
+  padding: 24rpx;
+  padding-bottom: 160rpx;
   position: relative;
-  flex: 1;
-  min-width: 0;
+  z-index: 1;
 }
 
-.assignee-select-box {
-  height: 64px;
-  line-height: 64px;
-  padding: 0 20px;
-  background: #f5f6fa;
-  border-radius: 16px;
-  color: #111827;
-  font-size: 26px;
+.record-form-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 24rpx;
+  padding: 24rpx;
   box-sizing: border-box;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.08);
 }
 
-.assignee-select-box.placeholder {
-  color: #9ca3af;
+.record-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12rpx; }
+.form-label.no-margin { margin: 0; }
+.form-item { margin-bottom: 20rpx; }
+.form-item:last-child { margin-bottom: 0; }
+.form-label { display: block; margin: 20rpx 0 10rpx; color: #374151; font-size: 28rpx; font-weight: 600; }
+.form-input,
+.form-picker,
+.datetime-picker,
+.assignee-select-box,
+.empty-calendar,
+.empty-member,
+.picker-value {
+  height: 72rpx; background: #f5f6fa; border-radius: 16rpx; padding: 0 22rpx; box-sizing: border-box;
+  color: #111827; font-size: 26rpx; display: flex; align-items: center;
 }
+.form-input { width: 100%; }
+.form-textarea { width: 100%; min-height: 220rpx; background: #f5f6fa; border-radius: 16rpx; padding: 20rpx 22rpx; box-sizing: border-box; color: #111827; font-size: 26rpx; }
+.form-row.two-col,
+.grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18rpx; }
+.form-col { min-width: 0; }
+.compact-item { margin-bottom: 12rpx; }
 
-.assignee-clear {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 24px;
-  color: #9ca3af;
-  line-height: 1;
-  padding: 4px;
-}
+.customer-file-btn { flex-shrink: 0; height: 56rpx; line-height: 56rpx; padding: 0 20rpx; border-radius: 999rpx; background: #eef2ff; color: #2563eb; font-size: 24rpx; white-space: nowrap; }
+.assignee-box-wrap { position: relative; min-width: 0; }
+.assignee-select-box { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assignee-select-box.placeholder,
+.empty-calendar,
+.empty-member { color: #9ca3af; }
+.assignee-clear { position: absolute; right: 16rpx; top: 50%; transform: translateY(-50%); font-size: 24rpx; color: #9ca3af; line-height: 1; padding: 4rpx; }
 
-.customer-file-btn {
-  flex-shrink: 0;
-  height: 56px;
-  line-height: 56px;
-  padding: 0 20px;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #2563eb;
-  font-size: 24px;
-  white-space: nowrap;
+.save-customer-row,
+.compact-checkbox { display: flex; align-items: center; gap: 10rpx; margin-top: 18rpx; margin-bottom: 18rpx; color: #4b5563; font-size: 24rpx; }
+.compact-checkbox checkbox { transform: scale(0.9); transform-origin: left center; }
+
+.clear-link { margin-top: 10rpx; font-size: 22rpx; color: #9ca3af; }
+.empty-calendar-guide { background: #f9fafb; border-radius: 18rpx; padding: 24rpx; }
+.empty-calendar-title { font-size: 28rpx; font-weight: 800; color: #111827; margin-bottom: 12rpx; }
+.empty-calendar-desc { font-size: 24rpx; color: #6b7280; line-height: 1.6; margin-bottom: 20rpx; }
+.empty-calendar-btn { background: #1677ff; color: #fff; border-radius: 16rpx; padding: 20rpx 24rpx; text-align: center; font-size: 26rpx; font-weight: 800; }
+
+.record-submit-bar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: transparent; z-index: 100; box-sizing: border-box;
 }
+.record-submit-btn {
+  width: 100%; height: 88rpx; line-height: 88rpx; border-radius: 16rpx; background: #1677ff; color: #fff; font-size: 30rpx; font-weight: 600;
+}
+.record-submit-btn[disabled] { background: #93c5fd; color: #fff; }
