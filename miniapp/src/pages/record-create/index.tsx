@@ -420,7 +420,7 @@ export default function RecordCreatePage() {
 
         <View className="form-row two-col">
           <View className="form-col">
-            <View className="form-item compact-item"><Text className="form-label">项目</Text><Input className="form-input" value={serviceName} maxlength={128} onInput={(e) => setServiceName(e.detail.value)} /></View>
+            <View className="form-item compact-item"><Text className="form-label">项目</Text><ProjectSelect calendarId={calendarId} value={serviceName} projectId={projectId} onChange={({ projectName, projectId: nextProjectId }) => { setServiceName(projectName); setProjectId(nextProjectId); }} /></View>
           </View>
           <View className="form-col">
             <View className="form-item compact-item"><Text className="form-label">负责人</Text><View className="assignee-box-wrap">
