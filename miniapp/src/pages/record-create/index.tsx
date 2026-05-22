@@ -143,6 +143,36 @@ export default function RecordCreatePage() {
 
   useDidShow(() => {
     loadCalendars();
+
+    const selectedCustomer = Taro.getStorageSync("record_selected_customer");
+
+    if (selectedCustomer) {
+      const selectedCustomerId =
+        Number(selectedCustomer.id || selectedCustomer.customer_id || 0) ||
+        undefined;
+      const selectedCustomerName = String(
+        selectedCustomer.name || selectedCustomer.customer_name || "",
+      );
+      const selectedCustomerPhone = String(
+        selectedCustomer.phone || selectedCustomer.customer_phone || "",
+      );
+
+      setCustomerId(selectedCustomerId);
+      setCustomerName(selectedCustomerName);
+      setCustomerPhone(selectedCustomerPhone);
+      setSaveToCustomer(false);
+
+      if (!title.trim()) {
+        const nextTitle = [selectedCustomerName.trim(), serviceName.trim()]
+          .filter(Boolean)
+          .join(" ");
+        if (nextTitle) {
+          setTitle(nextTitle);
+        }
+      }
+
+      Taro.removeStorageSync("record_selected_customer");
+    }
   });
 
   useEffect(() => {
@@ -367,17 +397,9 @@ export default function RecordCreatePage() {
         <View className="record-title-row">
           <Text className="form-label no-margin">标题</Text>
           <View className="customer-file-btn" onClick={() => {
-            if (!calendarId) { Taro.showToast({ title: '请先选择日历空间', icon: 'none' }); return }
+            if (!calendarId) { Taro.showToast({ title: '请先选择日历', icon: 'none' }); return }
             const url = `/pages/customer/select?calendar_id=${calendarId}`
-            const eventChannel = Taro.navigateTo({ url } as any)
-            Promise.resolve(eventChannel).then((res: any) => {
-              res?.eventChannel?.on?.('customerSelected', (payload: any) => {
-                setCustomerId(Number(payload?.customer_id || 0) || undefined)
-                setCustomerName(payload?.customer_name || '')
-                setCustomerPhone(payload?.customer_phone || '')
-                setSaveToCustomer(false)
-              })
-            })
+            Taro.navigateTo({ url })
           }}>客户档案</View>
         </View>
 
