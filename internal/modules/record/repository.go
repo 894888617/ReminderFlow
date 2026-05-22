@@ -727,13 +727,22 @@ func (r *Repository) Update(ctx context.Context, params UpdateRecordParams) (*Re
 			customer_name = $6,
 			customer_phone = $7,
 			service_name = $8,
+			project_id = $9,
+			project_name = $10,
 			updated_at = NOW()
 		WHERE id = $1
 		  AND deleted_at IS NULL
 		RETURNING id
-	`, params.ID, params.Title, params.Content, params.AssigneeID, params.DueAt, strings.TrimSpace(params.CustomerName), strings.TrimSpace(params.CustomerPhone), strings.TrimSpace(params.ServiceName)).Scan(&id)
+	`, params.ID, params.Title, params.Content, params.AssigneeID, params.DueAt, strings.TrimSpace(params.CustomerName), strings.TrimSpace(params.CustomerPhone), strings.TrimSpace(params.ServiceName), params.ProjectID, strings.TrimSpace(params.ProjectName)).Scan(&id)
 	if err != nil {
 		return nil, err
+	}
+
+
+	if strings.TrimSpace(params.ProjectName) != "" {
+		if err := r.upsertAppointmentProject(ctx, tx, params.CalendarID, strings.TrimSpace(params.ProjectName), params.UpdatedBy); err != nil {
+			log.Printf("[record.update] upsert appointment project failed: calendar_id=%d project_name=%q err=%v", params.CalendarID, params.ProjectName, err)
+		}
 	}
 
 	if params.UpdateCalendarAt {

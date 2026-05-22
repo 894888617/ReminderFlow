@@ -1,4 +1,5 @@
 import { View, Text, Input, Textarea, Picker, Checkbox, CheckboxGroup, Button } from "@tarojs/components";
+import ProjectSelect from "../../components/ProjectSelect";
 import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 
@@ -61,6 +62,7 @@ export default function RecordCreatePage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
+  const [projectId, setProjectId] = useState<number | null>(null);
   const [customerId, setCustomerId] = useState<number | undefined>();
   const [saveToCustomer, setSaveToCustomer] = useState(true);
   const [title, setTitle] = useState("");
@@ -267,7 +269,7 @@ export default function RecordCreatePage() {
       customer_phone: customerPhone.trim(),
       customer_remark: null,
       save_customer_to_library: customerId ? false : saveToCustomer,
-      project_id: null,
+      project_id: projectId,
       project_name: serviceName.trim(),
       ...overrides,
     });
