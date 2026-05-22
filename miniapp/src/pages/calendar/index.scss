@@ -614,37 +614,64 @@
   margin-top: 6px;
 }
 
-.timeline-card {
+.schedule-card {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 24px;
-  border-radius: 20px;
-  background: #ffffff;
-  margin-bottom: 18px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  padding: 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24rpx;
+  margin: 20rpx 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.06);
 }
 
-.timeline-time {
-  width: 82px;
+.schedule-time {
+  width: 88rpx;
   flex-shrink: 0;
-  font-size: 27px;
-  font-weight: 900;
   color: #1677ff;
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: left;
 }
 
-.timeline-main {
+.schedule-main {
   flex: 1;
   min-width: 0;
+  padding: 0 16rpx;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.timeline-main-content {
-  flex: 1;
-  min-width: 0;
+.schedule-title {
+  color: #111827;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 42rpx;
+}
+
+.schedule-remark {
+  margin-top: 8rpx;
+  color: #6b7280;
+  font-size: 26rpx;
+  line-height: 36rpx;
+  white-space: pre-wrap;
+}
+
+.schedule-side {
+  width: 132rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 10rpx;
+}
+
+.schedule-status {
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  line-height: 1;
 }
 
 .status-pending,
@@ -679,6 +706,19 @@
   color: #15803d;
 }
 
+.schedule-history-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  line-height: 1;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1rpx solid #bfdbfe;
+}
+
 .history-link {
   display: inline-flex;
   align-items: center;
@@ -693,11 +733,11 @@
   font-weight: 700;
 }
 
-.record-remark {
-  margin-top: -2px;
-  margin-bottom: 8px;
+.schedule-assignee {
   color: #6b7280;
-  font-size: 25px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  font-size: 24rpx;
+  max-width: 128rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -765,7 +765,7 @@ export default function CalendarPage() {
         {selectedDateEvents.map((item) => (
           <View
             key={item.id || item.event_id}
-            className="timeline-card"
+            className="schedule-card"
             onClick={() =>
               item.record_id &&
               Taro.navigateTo({
@@ -773,23 +773,16 @@ export default function CalendarPage() {
               })
             }
           >
-            <View className="timeline-time">{getEventTime(item)}</View>
-            <View className="timeline-main">
-              <View className="timeline-main-content">
-                <View className="record-title">{getEventTitle(item)}</View>
+            <View className="schedule-time">{getEventTime(item)}</View>
+            <View className="schedule-main">
+              <View className="schedule-title">{getEventTitle(item)}</View>
                 {getEventRemark(item) ? (
-                  <View className="record-remark">{getEventRemark(item)}</View>
+                  <View className="schedule-remark">{getEventRemark(item)}</View>
                 ) : null}
-              </View>
-              {!isSpecialEvent(item) ? (
-                <View className="record-assignee-name">
-                  {item.assignee_name || "未分配"}
-                </View>
-              ) : null}
             </View>
-            <View className="timeline-actions">
+            <View className="schedule-side">
               <View
-                className={`record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
+                className={`schedule-status record-status status-${getEventStatus(item)} ${item.record_id && canChangeRecordStatus ? "editable" : ""}`}
                 onClick={(event) => {
                   if (!item.record_id) return;
                   event.stopPropagation();
@@ -798,9 +791,12 @@ export default function CalendarPage() {
               >
                 {getStatusText(item.status, item.event_type)}
               </View>
+              <View className="schedule-assignee">
+                {item.assignee_name || "未分配"}
+              </View>
               {item.record_id && hasCustomerInfo(item) ? (
                 <View
-                  className="history-link"
+                  className="schedule-history-btn history-link"
                   onClick={(event) => {
                     event.stopPropagation();
                     const phone = item.customer_phone || "";
