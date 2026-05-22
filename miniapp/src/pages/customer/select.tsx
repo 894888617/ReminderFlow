@@ -43,13 +43,16 @@ export default function CustomerSelectPage() {
   }), [list, keyword])
 
   const handleSelectCustomer = (customer: Customer) => {
-    const ch = (getCurrentPages().slice(-2)[0] as any)
-    const evt = ch?.getOpenerEventChannel?.()
-    evt?.emit('customerSelected', {
-      customer_id: customer.id,
-      customer_name: customer.name || '',
-      customer_phone: customer.phone || '',
-      customer_remark: customer.remark || '',
+    const customerId = Number(customer?.id || 0)
+    if (!customerId) {
+      Taro.showToast({ title: '客户数据异常，无法选择', icon: 'none' })
+      return
+    }
+    Taro.setStorageSync('record_selected_customer', {
+      id: customerId,
+      name: customer.name || '',
+      phone: customer.phone || '',
+      remark: customer.remark || '',
     })
     Taro.navigateBack()
   }
