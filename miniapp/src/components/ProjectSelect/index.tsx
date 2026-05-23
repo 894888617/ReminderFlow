@@ -1,7 +1,7 @@
 import { Input, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createAppointmentProject, deleteAppointmentProject, listAppointmentProjects, type AppointmentProject, updateAppointmentProject } from '../../api/appointmentProject'
+import { createAppointmentProject, deleteAppointmentProject, listAppointmentProjects, type AppointmentProject } from '../../api/appointmentProject'
 import './index.scss'
 
 interface ProjectSelectProps {
@@ -18,8 +18,6 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   const [open, setOpen] = useState(false)
   const [keyword, setKeyword] = useState(value || '')
   const [loading, setLoading] = useState(false)
-  const [editingId, setEditingId] = useState<number>()
-  const [editingName, setEditingName] = useState('')
   const requestSeqRef = useRef(0)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -65,24 +63,6 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
     await deleteAppointmentProject(p.id)
     if (projectId === p.id) onChange({ projectId: null, projectName: '' })
     await load(keyword)
-  }
-
-  const saveEdit = async () => {
-    if (!editingId) return
-    const name = editingName.trim()
-    if (!name) {
-      Taro.showToast({ title: '名称不能为空', icon: 'none' })
-      return
-    }
-    try {
-      const updated = await updateAppointmentProject(editingId, name)
-      if (projectId === editingId) onChange({ projectId: editingId, projectName: updated.name })
-      setEditingId(undefined)
-      setEditingName('')
-      await load(keyword)
-    } catch {
-      Taro.showToast({ title: '该服务项目已存在', icon: 'none' })
-    }
   }
 
   const createProject = async () => {
@@ -139,18 +119,8 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
         <View className='project-dropdown'>
           {displayItems.slice(0, 6).map((p) => (
             <View key={p.id} className='project-item'>
-              {editingId === p.id ? (
-                <Input
-                  className='edit-input'
-                  value={editingName}
-                  onInput={(e) => setEditingName(e.detail.value)}
-                  onBlur={saveEdit}
-                />
-              ) : (
-                <Text className='project-name' onClick={() => select(p)}>{p.name}</Text>
-              )}
+              <Text className='project-name' onClick={() => select(p)}>{p.name}</Text>
               <View className='actions'>
-                <Text className='act' onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setEditingName(p.name) }}>编辑</Text>
                 <Text className='act delete' onClick={(e) => { e.stopPropagation(); remove(p) }}>删除</Text>
               </View>
             </View>
