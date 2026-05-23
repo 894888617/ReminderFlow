@@ -1,6 +1,6 @@
 import { Input, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createAppointmentProject, deleteAppointmentProject, listAppointmentProjects, type AppointmentProject, updateAppointmentProject } from '../../api/appointmentProject'
 import './index.scss'
 
@@ -17,20 +17,36 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   const [items, setItems] = useState<AppointmentProject[]>([])
   const [open, setOpen] = useState(false)
   const [keyword, setKeyword] = useState(value || '')
+  const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<number>()
   const [editingName, setEditingName] = useState('')
+  const requestSeqRef = useRef(0)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => setKeyword(value || ''), [value])
 
   const load = async (k = '') => {
     if (!calendarId) return
-    const list = await listAppointmentProjects(calendarId, k)
-    setItems(list || [])
+    const seq = ++requestSeqRef.current
+    setLoading(true)
+    try {
+      const list = await listAppointmentProjects(calendarId, k)
+      if (seq !== requestSeqRef.current) return
+      setItems(list || [])
+    } finally {
+      if (seq === requestSeqRef.current) setLoading(false)
+    }
   }
 
   useEffect(() => {
     load('')
   }, [calendarId])
+
+  useEffect(() => () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+  }, [])
 
   const normalizedKeyword = keyword.trim().toLowerCase()
   const filtered = useMemo(() => items.filter((i) => i.name.toLowerCase().includes(normalizedKeyword)), [items, normalizedKeyword])
@@ -100,14 +116,21 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
           onFocus={() => {
             if (disabled) return
             setOpen(true)
-            load('')
           }}
-          onBlur={() => setTimeout(() => setOpen(false), 160)}
+          onBlur={() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = setTimeout(() => setOpen(false), 180)
+          }}
           onInput={(e) => {
             const v = e.detail.value
             setKeyword(v)
             onChange({ projectId: null, projectName: v })
             setOpen(true)
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+            debounceTimerRef.current = setTimeout(() => {
+              if (!calendarId) return
+              load(v.trim())
+            }, 300)
           }}
         />
         <Text className='arrow'>▾</Text>
@@ -127,11 +150,12 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
                 <Text className='project-name' onClick={() => select(p)}>{p.name}</Text>
               )}
               <View className='actions'>
-                <Text className='act' onClick={() => { setEditingId(p.id); setEditingName(p.name) }}>编辑</Text>
-                <Text className='act delete' onClick={() => remove(p)}>删除</Text>
+                <Text className='act' onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setEditingName(p.name) }}>编辑</Text>
+                <Text className='act delete' onClick={(e) => { e.stopPropagation(); remove(p) }}>删除</Text>
               </View>
             </View>
           ))}
+          {loading ? <View className='empty'>加载中...</View> : null}
           {filtered.length === 0 && !createName ? <View className='empty'>暂无项目，可新增</View> : null}
           {filtered.length === 0 && createName ? <View className='create-item' onClick={createProject}>新增项目：{createName}</View> : null}
         </View>
