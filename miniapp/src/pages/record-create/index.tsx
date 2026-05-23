@@ -164,14 +164,15 @@ export default function RecordCreatePage() {
       setCustomerPhone(selectedCustomerPhone);
       setSaveToCustomer(false);
 
-      if (!title.trim()) {
-        const nextTitle = [selectedCustomerName.trim(), serviceName.trim()]
-          .filter(Boolean)
-          .join(" ");
-        if (nextTitle) {
-          setTitle(nextTitle);
-        }
-      }
+      // 客户档案选择客户时不设置title
+      // if (!title.trim()) {
+      //   const nextTitle = [selectedCustomerName.trim(), serviceName.trim()]
+      //     .filter(Boolean)
+      //     .join(" ");
+      //   if (nextTitle) {
+      //     setTitle(nextTitle);
+      //   }
+      // }
 
       Taro.removeStorageSync("record_selected_customer");
     }
