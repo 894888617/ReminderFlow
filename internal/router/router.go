@@ -69,10 +69,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	calendarRepo := calendar.NewRepository(db)
 	calendarHandler := calendar.NewHandler(calendarRepo)
 
-
 	notificationRepo := notification.NewRepository(db)
 	notificationHandler := notification.NewHandler(notificationRepo)
-
 
 	wechatMiniRepo := wechatmini.NewRepository(db)
 	wechatMiniHandler := wechatmini.NewHandler(cfg, wechatMiniRepo)
@@ -146,6 +144,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			authGroup.DELETE("/customers/:id", customerHandler.Delete)
 
 			authGroup.GET("/calendars/:calendar_id/appointment-projects", projectHandler.List)
+			authGroup.GET("/appointment-projects", projectHandler.List)
 			authGroup.POST("/calendars/:calendar_id/appointment-projects", projectHandler.Create)
 			authGroup.PUT("/appointment-projects/:id", projectHandler.Update)
 			authGroup.DELETE("/appointment-projects/:id", projectHandler.Delete)
