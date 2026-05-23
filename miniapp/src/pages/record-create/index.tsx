@@ -407,7 +407,7 @@ export default function RecordCreatePage() {
         </View>
 
         <View className="form-item">
-          <Input className="form-input" value={title} placeholder="可留空自动生成 客户姓名 + 服务项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
+          <Input className="form-input" value={title} placeholder="可留空自动生成 姓名-项目" maxlength={200} onInput={(e) => setTitle(e.detail.value)} />
         </View>
 
         <View className="form-row two-col">
