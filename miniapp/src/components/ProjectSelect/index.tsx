@@ -34,6 +34,7 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
 
   const normalizedKeyword = keyword.trim().toLowerCase()
   const filtered = useMemo(() => items.filter((i) => i.name.toLowerCase().includes(normalizedKeyword)), [items, normalizedKeyword])
+  const displayItems = useMemo(() => (normalizedKeyword ? filtered : items), [filtered, items, normalizedKeyword])
   const createName = keyword.trim()
 
   const select = (p: AppointmentProject) => {
@@ -71,7 +72,8 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   const createProject = async () => {
     const name = createName
     if (!name || !calendarId) return
-    const exist = items.find((i) => i.name === name)
+    const normalized = name.toLowerCase()
+    const exist = items.find((i) => i.name.trim().toLowerCase() === normalized)
     if (exist) {
       select(exist)
       return
@@ -112,7 +114,7 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
       </View>
       {open ? (
         <View className='project-dropdown'>
-          {(filtered.length ? filtered : items).slice(0, 6).map((p) => (
+          {displayItems.slice(0, 6).map((p) => (
             <View key={p.id} className='project-item'>
               {editingId === p.id ? (
                 <Input
