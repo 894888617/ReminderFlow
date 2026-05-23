@@ -1,8 +1,11 @@
-import { Picker, View, Text } from "@tarojs/components";
-import Taro, { useDidShow, usePullDownRefresh, useRouter } from "@tarojs/taro";
-import { useMemo, useState } from "react";
+import {Picker, Text, View} from "@tarojs/components";
+import Taro, {useDidShow, usePullDownRefresh, useRouter} from "@tarojs/taro";
+import {useMemo, useState} from "react";
 
 import {
+  type Calendar,
+  type CalendarEvent,
+  type CalendarMember,
   createSpecialCalendarEvent,
   deleteCalendarEvent,
   getMemberWorkloadStats,
@@ -10,24 +13,15 @@ import {
   listCalendarEvents,
   listCalendarMembers,
   listCalendars,
-  normalizeCalendarRole,
-  type Calendar,
-  type CalendarEvent,
-  type CalendarMember,
   type MemberWorkloadItem,
   type MonthlyCalendarStats,
+  normalizeCalendarRole,
 } from "../../api/calendar";
-import { updateRecordStatus } from "../../api/record";
-import { canCreateRecord, canUpdateRecordStatus } from "../../utils/permission";
-import { getStoredToken, getStoredUser } from "../../utils/auth";
-import {
-  CALENDAR_RETURN_CONTEXT_KEY,
-  type CalendarReturnContext,
-} from "../../utils/calendarReturn";
-import {
-  getUserNameDisplay,
-  getWechatDisplayName,
-} from "../../utils/userDisplay";
+import {updateRecordStatus} from "../../api/record";
+import {canCreateRecord, canUpdateRecordStatus} from "../../utils/permission";
+import {getStoredToken, getStoredUser} from "../../utils/auth";
+import {CALENDAR_RETURN_CONTEXT_KEY, type CalendarReturnContext,} from "../../utils/calendarReturn";
+import {getUserNameDisplay, getWechatDisplayName,} from "../../utils/userDisplay";
 import {
   getRecordStatusText,
   normalizeRecordStatus,
@@ -42,9 +36,9 @@ const SELECTED_CALENDAR_KEY = "selected_calendar_id";
 
 const statusOptions = [
   ...RECORD_STATUS_FILTER_OPTIONS,
-  { label: "休息", value: "rest" },
-  { label: "不接", value: "blocked" },
-  { label: "已满", value: "full" },
+  {label: "休息", value: "rest"},
+  {label: "不接", value: "blocked"},
+  {label: "已满", value: "full"},
 ];
 
 const specialStatusValues = ["rest", "blocked", "full"];
@@ -162,10 +156,10 @@ function getMonthDays(date: Date) {
   const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const result: Array<{ key: string; day?: number; date?: string }> = [];
 
-  for (let i = 0; i < leading; i += 1) result.push({ key: `empty-${i}` });
+  for (let i = 0; i < leading; i += 1) result.push({key: `empty-${i}`});
   for (let day = 1; day <= days; day += 1) {
     const current = new Date(date.getFullYear(), date.getMonth(), day);
-    result.push({ key: formatDate(current), day, date: formatDate(current) });
+    result.push({key: formatDate(current), day, date: formatDate(current)});
   }
   return result;
 }
@@ -271,9 +265,9 @@ export default function CalendarPage() {
     [calendars, currentCalendarId],
   );
   const memberFilterOptions = useMemo(() => {
-    const options = [{ label: "全部负责人", value: "" }];
+    const options = [{label: "全部负责人", value: ""}];
     if (currentUser?.id)
-      options.push({ label: "只看我", value: String(currentUser.id) });
+      options.push({label: "只看我", value: String(currentUser.id)});
     members.forEach((item) => {
       if (!options.some((option) => option.value === String(item.user_id))) {
         options.push({
@@ -352,7 +346,7 @@ export default function CalendarPage() {
     baseDate = currentDate,
   ) => {
     if (!getStoredToken()) {
-      Taro.redirectTo({ url: "/pages/login/index" });
+      Taro.redirectTo({url: "/pages/login/index"});
       return;
     }
     try {
@@ -399,10 +393,10 @@ export default function CalendarPage() {
     const nextSelectedDate = returnContext?.selected_date || routeSelectedDate;
     const nextCalendarId = Number(
       returnContext?.currentCalendarId ||
-        returnContext?.current_calendar_id ||
-        returnContext?.calendar_id ||
-        routeCalendarId ||
-        currentCalendarId,
+      returnContext?.current_calendar_id ||
+      returnContext?.calendar_id ||
+      routeCalendarId ||
+      currentCalendarId,
     );
     const nextDateText = returnContext?.current_date || nextSelectedDate;
     const nextDate = nextDateText ? parseDate(nextDateText) : currentDate;
@@ -505,7 +499,7 @@ export default function CalendarPage() {
   const goCreateRecord = (date = selectedDate) => {
     if (!currentCalendarId) return;
     if (!writable) {
-      Taro.showToast({ title: "你只有查看权限", icon: "none" });
+      Taro.showToast({title: "你只有查看权限", icon: "none"});
       return;
     }
     Taro.navigateTo({
@@ -516,20 +510,20 @@ export default function CalendarPage() {
   const goSetSpecialDay = async (date: string, type: "rest" | "blocked" | "full") => {
     if (!currentCalendarId) return;
     if (!writable) {
-      Taro.showToast({ title: "你只有查看权限", icon: "none" });
+      Taro.showToast({title: "你只有查看权限", icon: "none"});
       return;
     }
     const selectedAssignee =
       assigneeFilter || (currentUser?.id ? String(currentUser.id) : "");
 
     if (!selectedAssignee) {
-      Taro.showToast({ title: "缺少负责人", icon: "none" });
+      Taro.showToast({title: "缺少负责人", icon: "none"});
       return;
     }
 
     if (type === "full") {
       try {
-        Taro.showLoading({ title: "设置中", mask: true });
+        Taro.showLoading({title: "设置中", mask: true});
         await createSpecialCalendarEvent(currentCalendarId, {
           date,
           type: "full",
@@ -538,11 +532,11 @@ export default function CalendarPage() {
         });
         await refreshCalendarData();
         Taro.hideLoading();
-        Taro.showToast({ title: "已设置为已满", icon: "success" });
+        Taro.showToast({title: "已设置为已满", icon: "success"});
       } catch (err) {
         console.error(err);
         Taro.hideLoading();
-        Taro.showToast({ title: "设置失败", icon: "none" });
+        Taro.showToast({title: "设置失败", icon: "none"});
       }
       return;
     }
@@ -555,7 +549,7 @@ export default function CalendarPage() {
 
   const handleOpenCalendarActions = () => {
     if (!currentCalendarId) {
-      Taro.showToast({ title: "请先选择日历", icon: "none" });
+      Taro.showToast({title: "请先选择日历", icon: "none"});
       return;
     }
 
@@ -569,7 +563,7 @@ export default function CalendarPage() {
         const item = itemList[res.tapIndex];
 
         if (item === "创建日历") {
-          Taro.navigateTo({ url: "/pages/calendar-create/index" });
+          Taro.navigateTo({url: "/pages/calendar-create/index"});
           return;
         }
 
@@ -598,19 +592,19 @@ export default function CalendarPage() {
 
   const handleLongPressDate = (date: string) => {
     if (!currentCalendarId) {
-      Taro.showToast({ title: "请先选择日历", icon: "none" });
+      Taro.showToast({title: "请先选择日历", icon: "none"});
       return;
     }
 
     if (!writable) {
-      Taro.showToast({ title: "你只有查看权限", icon: "none" });
+      Taro.showToast({title: "你只有查看权限", icon: "none"});
       return;
     }
 
     setSelectedDate(date);
     setCurrentDate(parseDate(date));
 
-    Taro.vibrateShort({ type: "light" });
+    Taro.vibrateShort({type: "light"});
 
     Taro.showActionSheet({
       itemList: ["新建日程", "设置休息", "设置不接", "设置已满"],
@@ -635,16 +629,19 @@ export default function CalendarPage() {
   };
 
   const goCustomer = () => {
-    if (!currentCalendarId) { Taro.showToast({ title: "请先选择空间", icon: "none" }); return; }
-    Taro.navigateTo({ url: `/pages/customer/index?calendar_id=${currentCalendarId}` });
+    if (!currentCalendarId) {
+      Taro.showToast({title: "请先选择空间", icon: "none"});
+      return;
+    }
+    Taro.navigateTo({url: `/pages/customer/index?calendar_id=${currentCalendarId}`});
   };
 
   const goProfile = () => {
-    Taro.navigateTo({ url: "/pages/profile/index" });
+    Taro.navigateTo({url: "/pages/profile/index"});
   };
   const handleDeleteSpecialEvent = (item: CalendarEvent) => {
     if (!item.id) {
-      Taro.showToast({ title: "状态记录缺少 ID", icon: "none" });
+      Taro.showToast({title: "状态记录缺少 ID", icon: "none"});
       return;
     }
 
@@ -654,15 +651,15 @@ export default function CalendarPage() {
       success: async (res) => {
         if (!res.confirm) return;
         try {
-          Taro.showLoading({ title: "删除中", mask: true });
+          Taro.showLoading({title: "删除中", mask: true});
           await deleteCalendarEvent(item.id);
           await loadEvents(currentCalendarId);
           Taro.hideLoading();
-          Taro.showToast({ title: "删除成功", icon: "success" });
+          Taro.showToast({title: "删除成功", icon: "success"});
         } catch (err) {
           console.error(err);
           Taro.hideLoading();
-          Taro.showToast({ title: "删除失败", icon: "none" });
+          Taro.showToast({title: "删除失败", icon: "none"});
         }
       },
     });
@@ -680,7 +677,7 @@ export default function CalendarPage() {
     if (!item.record_id) return;
 
     if (!canChangeRecordStatus) {
-      Taro.showToast({ title: "无状态修改权限", icon: "none" });
+      Taro.showToast({title: "无状态修改权限", icon: "none"});
       return;
     }
 
@@ -694,15 +691,15 @@ export default function CalendarPage() {
         if (!nextStatus || nextStatus === currentStatus) return;
 
         try {
-          Taro.showLoading({ title: "更新中", mask: true });
+          Taro.showLoading({title: "更新中", mask: true});
           await updateRecordStatus(item.record_id!, nextStatus);
           await refreshCalendarData();
           Taro.hideLoading();
-          Taro.showToast({ title: "状态已更新", icon: "success" });
+          Taro.showToast({title: "状态已更新", icon: "success"});
         } catch (err) {
           console.error(err);
           Taro.hideLoading();
-          Taro.showToast({ title: "状态更新失败", icon: "none" });
+          Taro.showToast({title: "状态更新失败", icon: "none"});
           await refreshCalendarData();
         }
       },
@@ -732,7 +729,7 @@ export default function CalendarPage() {
           <View className="nav-calendar-pill">
             <Text className="nav-calendar-name">
               {selectedCalendar?.name || "选择日历"}
-            </Text> 
+            </Text>
           </View>
         </Picker>
 
@@ -776,9 +773,14 @@ export default function CalendarPage() {
             <View className="schedule-time">{getEventTime(item)}</View>
             <View className="schedule-main">
               <View className="schedule-title">{getEventTitle(item)}</View>
-                {getEventRemark(item) ? (
-                  <View className="schedule-remark">{getEventRemark(item)}</View>
-                ) : null}
+              {getEventRemark(item) ? (
+                <View className="schedule-remark">{getEventRemark(item)}</View>
+              ) : null}
+              {item.record_id ? (
+                <View className="schedule-assignee">
+                  {item.assignee_name || "未分配"}
+                </View>
+              ) : null}
             </View>
             <View className="schedule-side">
               <View
@@ -790,9 +792,6 @@ export default function CalendarPage() {
                 }}
               >
                 {getStatusText(item.status, item.event_type)}
-              </View>
-              <View className="schedule-assignee">
-                {item.assignee_name || "未分配"}
               </View>
               {item.record_id && hasCustomerInfo(item) ? (
                 <View
@@ -839,7 +838,7 @@ export default function CalendarPage() {
           <View
             className="onboarding-primary-btn"
             onClick={() =>
-              Taro.navigateTo({ url: "/pages/calendar-create/index" })
+              Taro.navigateTo({url: "/pages/calendar-create/index"})
             }
           >
             创建第一个日历
