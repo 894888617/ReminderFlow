@@ -1,1 +1,26 @@
-.project-select{position:relative}.project-dropdown{position:absolute;left:0;right:0;top:76rpx;background:#fff;border:1px solid #eee;border-radius:12rpx;z-index:20;max-height:360rpx;overflow:auto}.project-item{display:flex;justify-content:space-between;align-items:center;padding:16rpx 20rpx;border-bottom:1px solid #f4f4f4}.project-name{flex:1}.actions{display:flex;gap:20rpx}.act{color:#2f80ed}.act.delete{color:#eb5757}.empty{padding:20rpx;color:#999}.edit-input{border:1px solid #ddd;border-radius:8rpx;padding:6rpx 10rpx;flex:1}
+.project-select { position: relative; }
+.select-input-wrap { position: relative; }
+.project-input { padding-right: 52rpx; }
+.arrow { position: absolute; right: 18rpx; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 26rpx; }
+.select-input-wrap.disabled .arrow { color: #cbd5e1; }
+.project-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 76rpx;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12rpx;
+  box-shadow: 0 8rpx 28rpx rgba(15, 23, 42, .08);
+  z-index: 200;
+  max-height: 380rpx;
+  overflow-y: auto;
+}
+.project-item { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 20rpx; border-bottom: 1px solid #f3f4f6; gap: 14rpx; }
+.project-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { flex-shrink: 0; display: flex; gap: 16rpx; }
+.act { color: #2563eb; font-size: 24rpx; }
+.act.delete { color: #dc2626; }
+.empty { padding: 20rpx; color: #9ca3af; font-size: 24rpx; }
+.create-item { padding: 20rpx; color: #2563eb; font-size: 24rpx; border-top: 1px solid #f3f4f6; }
+.edit-input { border: 1px solid #d1d5db; border-radius: 8rpx; padding: 6rpx 10rpx; flex: 1; }
