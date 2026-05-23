@@ -3,6 +3,7 @@ import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
 import { getRecordDetail, updateRecord, type RecordItem } from '../../api/record'
+import { createAppointmentProject, listAppointmentProjects } from '../../api/appointmentProject'
 import { listCalendarMembers, type CalendarMember } from '../../api/calendar'
 import { canEditRecord } from '../../utils/permission'
 import { getStoredToken } from '../../utils/auth'
@@ -46,9 +47,35 @@ export default function RecordEditPage() {
   }
   useDidShow(loadData)
 
+  const ensureProjectPersisted = async () => {
+    const normalizedName = projectName.trim();
+    const currentCalendarId = record?.calendar_id || 0;
+
+    if (!currentCalendarId || !normalizedName) {
+      return { ensuredProjectId: null as number | null, ensuredProjectName: normalizedName };
+    }
+
+    const projects = await listAppointmentProjects(currentCalendarId, '');
+    const matched = (projects || []).find((item) => item.name.trim().toLowerCase() === normalizedName.toLowerCase());
+
+    if (matched) {
+      if (matched.id !== projectId || matched.name !== projectName) {
+        setProjectId(matched.id);
+        setProjectName(matched.name);
+      }
+      return { ensuredProjectId: matched.id, ensuredProjectName: matched.name };
+    }
+
+    const created = await createAppointmentProject(currentCalendarId, normalizedName);
+    setProjectId(created.id);
+    setProjectName(created.name);
+    return { ensuredProjectId: created.id, ensuredProjectName: created.name };
+  };
+
   const handleSubmit = async () => {
     if (!editable || submitting || !record) return
     setSubmitting(true)
+    const { ensuredProjectId, ensuredProjectName } = await ensureProjectPersisted()
     const normalizedStatus = normalizeRecordStatus(status)
     const payloadBase: any = {
       calendar_id: record.calendar_id,
@@ -58,8 +85,8 @@ export default function RecordEditPage() {
       customer_phone: customerPhone.trim(),
       customer_remark: null,
       save_customer_to_library: customerId ? false : saveToCustomer,
-      project_id: projectId,
-      project_name: projectName.trim(),
+      project_id: ensuredProjectId,
+      project_name: ensuredProjectName,
       assignee_id: assigneeId,
       appointment_date: appointmentDate || undefined,
       start_time: startTime || undefined,

@@ -11,6 +11,7 @@ import {
   type CalendarMember,
 } from "../../api/calendar";
 import { createRecord } from "../../api/record";
+import { listAppointmentProjects, createAppointmentProject } from "../../api/appointmentProject";
 import { canCreateRecord } from "../../utils/permission";
 
 import { getStoredToken, getStoredUser } from "../../utils/auth";
@@ -224,6 +225,30 @@ export default function RecordCreatePage() {
     };
   }, [calendarId]);
 
+  const ensureProjectPersisted = async () => {
+    const normalizedName = serviceName.trim();
+
+    if (!calendarId || !normalizedName) {
+      return { ensuredProjectId: null as number | null, ensuredProjectName: normalizedName };
+    }
+
+    const projects = await listAppointmentProjects(calendarId, "");
+    const matched = (projects || []).find((item) => item.name.trim().toLowerCase() === normalizedName.toLowerCase());
+
+    if (matched) {
+      if (matched.id !== projectId || matched.name !== serviceName) {
+        setProjectId(matched.id);
+        setServiceName(matched.name);
+      }
+      return { ensuredProjectId: matched.id, ensuredProjectName: matched.name };
+    }
+
+    const created = await createAppointmentProject(calendarId, normalizedName);
+    setProjectId(created.id);
+    setServiceName(created.name);
+    return { ensuredProjectId: created.id, ensuredProjectName: created.name };
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
 
@@ -253,6 +278,8 @@ export default function RecordCreatePage() {
     const calendarStartAt = buildDateTime(finalAppointmentDate, finalStartTime);
     const calendarAllDay = !finalStartTime;
 
+    const { ensuredProjectId, ensuredProjectName } = await ensureProjectPersisted();
+
     const buildPayload = (overrides?: Partial<any>) => ({
       calendar_id: calendarId,
       title: finalTitle,
@@ -270,8 +297,8 @@ export default function RecordCreatePage() {
       customer_phone: customerPhone.trim(),
       customer_remark: null,
       save_customer_to_library: customerId ? false : saveToCustomer,
-      project_id: projectId,
-      project_name: serviceName.trim(),
+      project_id: ensuredProjectId,
+      project_name: ensuredProjectName,
       ...overrides,
     });
     try {
