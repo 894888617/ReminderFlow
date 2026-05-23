@@ -37,8 +37,22 @@ func (h *Handler) List(c *gin.Context) {
 		response.Forbidden(c, "no permission")
 		return
 	}
-	kw := "%" + strings.TrimSpace(c.Query("keyword")) + "%"
-	rows, err := h.db.Query(c.Request.Context(), `SELECT id,calendar_id,name,usage_count,last_used_at FROM appointment_projects WHERE calendar_id=$1 AND deleted_at IS NULL AND ($2='%%' OR name ILIKE $2) ORDER BY last_used_at DESC NULLS LAST, usage_count DESC, created_at DESC`, cid, kw)
+	keyword := strings.TrimSpace(c.Query("keyword"))
+
+	query := `
+		SELECT id, calendar_id, name, usage_count, last_used_at
+		FROM appointment_projects
+		WHERE calendar_id = $1 AND deleted_at IS NULL`
+	args := []any{cid}
+
+	if keyword != "" {
+		query += ` AND name ILIKE $2`
+		args = append(args, "%"+keyword+"%")
+	}
+
+	query += ` ORDER BY last_used_at DESC NULLS LAST, usage_count DESC, updated_at DESC, created_at DESC`
+
+	rows, err := h.db.Query(c.Request.Context(), query, args...)
 	if err != nil {
 		response.Internal(c, "query projects failed")
 		return
