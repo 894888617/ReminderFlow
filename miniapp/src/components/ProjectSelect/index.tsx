@@ -51,18 +51,30 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   const displayItems = useMemo(() => (normalizedKeyword ? filtered : items), [filtered, items, normalizedKeyword])
   const createName = keyword.trim()
 
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
   const select = (p: AppointmentProject) => {
+    clearCloseTimer()
     onChange({ projectId: p.id, projectName: p.name })
     setKeyword(p.name)
     setOpen(false)
   }
 
   const remove = async (p: AppointmentProject) => {
+    clearCloseTimer()
     const ok = await Taro.showModal({ title: '确认删除', content: '确认删除该服务项目吗？删除后不会影响历史预约记录。' })
     if (!ok.confirm) return
     await deleteAppointmentProject(p.id)
-    if (projectId === p.id) onChange({ projectId: null, projectName: '' })
-    await load(keyword)
+    setItems((prev) => prev.filter((item) => item.id !== p.id))
+    if (projectId === p.id) {
+      onChange({ projectId: null, projectName: '' })
+      setKeyword('')
+    }
   }
 
   const createProject = async () => {
@@ -76,10 +88,10 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
     }
     try {
       const created = await createAppointmentProject(calendarId, name)
+      setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)])
       onChange({ projectId: created.id, projectName: created.name })
       setKeyword(created.name)
       setOpen(false)
-      await load('')
     } catch {
       Taro.showToast({ title: '新增项目失败', icon: 'none' })
     }
@@ -90,21 +102,23 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
       <View className={`select-input-wrap ${disabled ? 'disabled' : ''}`}>
         <Input
           className='form-input project-input'
-          value={value}
+          value={keyword}
           placeholder={placeholder}
           disabled={disabled}
           onFocus={() => {
             if (disabled) return
+            clearCloseTimer()
             setOpen(true)
           }}
           onBlur={() => {
-            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+            clearCloseTimer()
             closeTimerRef.current = setTimeout(() => setOpen(false), 180)
           }}
           onInput={(e) => {
             const v = e.detail.value
             setKeyword(v)
             onChange({ projectId: null, projectName: v })
+            clearCloseTimer()
             setOpen(true)
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
             debounceTimerRef.current = setTimeout(() => {
@@ -116,10 +130,18 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
         <Text className='arrow'>▾</Text>
       </View>
       {open ? (
-        <View className='project-dropdown'>
+        <View
+          className='project-dropdown'
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           {displayItems.slice(0, 6).map((p) => (
-            <View key={p.id} className='project-item'>
-              <Text className='project-name' onClick={() => select(p)}>{p.name}</Text>
+            <View key={p.id} className='project-item' onClick={() => select(p)}
+             
+            >
+              <Text className='project-name'>{p.name}</Text>
               <View className='actions'>
                 <Text className='act delete' onClick={(e) => { e.stopPropagation(); remove(p) }}>删除</Text>
               </View>
