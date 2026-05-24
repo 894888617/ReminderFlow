@@ -98,45 +98,63 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   }
 
   return (
-    <View className='project-select'>
-      <View className={`select-input-wrap ${disabled ? 'disabled' : ''}`}>
-        <Input
-          className='form-input project-input'
-          value={keyword}
-          placeholder={placeholder}
-          disabled={disabled}
-          onFocus={() => {
-            if (disabled) return
-            clearCloseTimer()
-            setOpen(true)
-          }}
-          onBlur={() => {
-            clearCloseTimer()
-            closeTimerRef.current = setTimeout(() => setOpen(false), 180)
-          }}
-          onInput={(e) => {
-            const v = e.detail.value
-            setKeyword(v)
-            onChange({ projectId: null, projectName: v })
-            clearCloseTimer()
-            setOpen(true)
-            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-            debounceTimerRef.current = setTimeout(() => {
-              if (!calendarId) return
-              load(v.trim())
-            }, 300)
-          }}
-        />
+    <View className='project-select' onClick={() => setOpen(false)}>
+      <View
+        className={`select-input-wrap ${disabled ? 'disabled' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (disabled) return
+          clearCloseTimer()
+          setOpen(true)
+        }}
+      >
+        <View className={`form-input project-trigger ${!value ? 'placeholder' : ''}`}>
+          {value || placeholder}
+        </View>
         <Text className='arrow'>▾</Text>
       </View>
-      {open ? (
-        <View
-          className='project-dropdown'
-          onClick={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onTouchMove={(e) => e.stopPropagation()}
-          onTouchEnd={(e) => e.stopPropagation()}
-        >
+      <View
+        className={`project-mask ${open ? 'visible' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen(false)
+        }}
+      />
+      <View
+        className={`project-dropdown ${open ? 'visible' : 'hidden'}`}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
+          <Input
+            className='form-input project-input'
+            value={keyword}
+            placeholder='输入搜索或新增项目'
+            adjustPosition={false}
+            cursorSpacing={0}
+            onFocus={(e) => {
+              e.stopPropagation()
+              clearCloseTimer()
+              setOpen(true)
+            }}
+            onBlur={() => {
+              clearCloseTimer()
+              closeTimerRef.current = setTimeout(() => setOpen(false), 180)
+            }}
+            onInput={(e) => {
+              const v = e.detail.value
+              setKeyword(v)
+              onChange({ projectId: null, projectName: v })
+              clearCloseTimer()
+              setOpen(true)
+              if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+              debounceTimerRef.current = setTimeout(() => {
+                if (!calendarId) return
+                load(v.trim())
+              }, 300)
+            }}
+          />
           {displayItems.slice(0, 6).map((p) => (
             <View key={p.id} className='project-item' onClick={() => select(p)}
              
@@ -150,8 +168,7 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
           {loading ? <View className='empty'>加载中...</View> : null}
           {filtered.length === 0 && !createName ? <View className='empty'>暂无项目，可新增</View> : null}
           {filtered.length === 0 && createName ? <View className='create-item' onClick={createProject}>新增项目：{createName}</View> : null}
-        </View>
-      ) : null}
+      </View>
     </View>
   )
 }
