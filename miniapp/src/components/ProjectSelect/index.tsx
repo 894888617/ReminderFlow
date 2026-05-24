@@ -98,7 +98,7 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
   }
 
   return (
-    <View className='project-select' onClick={() => setOpen(false)}>
+    <View className='project-select-wrap' onClick={() => setOpen(false)}>
       <View
         className={`select-input-wrap ${disabled ? 'disabled' : ''}`}
         onClick={(e) => {
@@ -114,19 +114,18 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
         <Text className='arrow'>▾</Text>
       </View>
       <View
-        className={`project-mask ${open ? 'visible' : ''}`}
+        className={`project-dropdown-root ${open ? 'show' : ''}`}
         onClick={(e) => {
           e.stopPropagation()
-          setOpen(false)
         }}
-      />
-      <View
-        className={`project-dropdown ${open ? 'visible' : 'hidden'}`}
-        onClick={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
-        onTouchEnd={(e) => e.stopPropagation()}
       >
+        <View
+          className='project-dropdown-panel'
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           <Input
             className='form-input project-input'
             value={keyword}
@@ -168,6 +167,7 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
           {loading ? <View className='empty'>加载中...</View> : null}
           {filtered.length === 0 && !createName ? <View className='empty'>暂无项目，可新增</View> : null}
           {filtered.length === 0 && createName ? <View className='create-item' onClick={createProject}>新增项目：{createName}</View> : null}
+        </View>
       </View>
     </View>
   )
