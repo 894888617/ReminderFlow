@@ -247,6 +247,8 @@ export default function CalendarPage() {
     null,
   );
   const [workload, setWorkload] = useState<MemberWorkloadItem[]>([]);
+  const [toolbarStyle, setToolbarStyle] = useState<Record<string, string>>({});
+  const [pageContentStyle, setPageContentStyle] = useState<Record<string, string>>({});
 
   const selectedCalendar = useMemo(
     () => calendars.find((item) => item.id === currentCalendarId),
@@ -300,6 +302,31 @@ export default function CalendarPage() {
   const accountText = accountName && accountName !== "-" ? accountName : "我的";
   const accountAvatarText =
     accountText === "我的" ? "我" : accountText.slice(0, 1);
+
+  const updateToolbarLayout = () => {
+    const menuButton = Taro.getMenuButtonBoundingClientRect?.();
+    const systemInfo = Taro.getSystemInfoSync();
+    const windowWidth = systemInfo.windowWidth || 375;
+    const fallbackTop = (systemInfo.statusBarHeight || 20) + 44;
+
+    const top = (menuButton?.bottom || fallbackTop) + 14;
+    const right = menuButton?.left
+      ? Math.max(windowWidth - menuButton.left + 12, 12)
+      : 12;
+    const minHeight = 76;
+
+    setToolbarStyle({
+      top: `${top}px`,
+      left: "12px",
+      right: `${right}px`,
+      zIndex: "9999",
+    });
+
+    setPageContentStyle({
+      paddingTop: `${top + minHeight + 18}px`,
+    });
+  };
+
 
   const loadMembers = async (calendarId: number) => {
     if (!calendarId) {
@@ -405,6 +432,7 @@ export default function CalendarPage() {
     if (nextDateText) setCurrentDate(nextDate);
     if (nextCalendarId) setCurrentCalendarId(nextCalendarId);
 
+    updateToolbarLayout();
     loadData(nextCalendarId, nextDate);
   });
 
@@ -829,7 +857,8 @@ export default function CalendarPage() {
   if (!loading && calendars.length === 0) {
     return (
       <View className="container calendar-container">
-        {renderCustomNav()}
+        <View className="top-fixed-toolbar" style={toolbarStyle}>{renderCustomNav()}</View>
+        <View className="page-content" style={pageContentStyle}>
         <View className="onboarding-empty">
           <View className="onboarding-title">还没有日历</View>
           <View className="onboarding-desc">
@@ -847,13 +876,15 @@ export default function CalendarPage() {
             也可以通过好友分享的邀请码加入已有日历。
           </View>
         </View>
+        </View>
       </View>
     );
   }
 
   return (
     <View className="container calendar-container">
-      {renderCustomNav()}
+      <View className="top-fixed-toolbar" style={toolbarStyle}>{renderCustomNav()}</View>
+      <View className="page-content" style={pageContentStyle}>
       <View className="compact-stats-card">
         <View className="compact-stats-title">本月统计</View>
         <View className="compact-stats-row">
@@ -971,6 +1002,7 @@ export default function CalendarPage() {
       {/*</View>*/}
 
       {renderScheduleList()}
+      </View>
     </View>
   );
 }
