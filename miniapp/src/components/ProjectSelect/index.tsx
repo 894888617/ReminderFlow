@@ -97,6 +97,10 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
     }
   }
 
+  const selectedNames = value
+    ? value.split(',').map((item) => item.trim()).filter(Boolean).join('、')
+    : ''
+
   return (
     <View className='project-select-wrap' onClick={() => setOpen(false)}>
       <View
@@ -108,10 +112,10 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
           setOpen(true)
         }}
       >
-        <View className={`form-input project-trigger ${!value ? 'placeholder' : ''}`}>
-          {value || placeholder}
+        <View className={`form-input project-select-box ${!selectedNames ? 'placeholder' : ''}`}>
+          <Text className='project-select-text'>{selectedNames || placeholder}</Text>
+          <Text className='arrow'>⌄</Text>
         </View>
-        <Text className='arrow'>▾</Text>
       </View>
       <View
         className={`project-dropdown-root ${open ? 'show' : ''}`}
@@ -127,11 +131,12 @@ export default function ProjectSelect({ calendarId, value, projectId, onChange, 
           onTouchEnd={(e) => e.stopPropagation()}
         >
           <Input
-            className='form-input project-input'
+            className='project-search-input'
             value={keyword}
             placeholder='输入搜索或新增项目'
             adjustPosition={false}
             cursorSpacing={0}
+            alwaysEmbed
             onFocus={(e) => {
               e.stopPropagation()
               clearCloseTimer()
