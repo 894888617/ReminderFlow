@@ -51,7 +51,7 @@ export default function CalendarMembersPage() {
   const router = useRouter()
   const calendarId = Number(router.params.calendar_id || router.params.id || 0)
 
-  const [setCalendarName] = useState('')
+  const [calendarName, setCalendarName] = useState('')
   const [currentRole, setCurrentRole] = useState('')
   const [members, setMembers] = useState<CalendarMember[]>([])
   const [loading, setLoading] = useState(false)
@@ -204,9 +204,6 @@ export default function CalendarMembersPage() {
       {manageable && (
         <View className='add-member-card'>
           <View className='add-member-title'>添加日历成员</View>
-          <View className='add-member-desc'>
-            输入对方账号添加成员。支持用户名、邮箱或微信昵称。
-          </View>
 
           <View className='member-account-input-wrap'>
             <Input

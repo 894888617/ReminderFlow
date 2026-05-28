@@ -161,10 +161,6 @@ export default function LoginPage() {
       <View className='login-card'>
         <Text className='login-title'>轻记协同</Text>
 
-        <Text className='login-desc'>
-          协同记录与日历预约管理，适合个人和小团队使用。
-        </Text>
-
         <View className='profile-form'>
           <Text className='field-label'>登录昵称（选填）</Text>
           <Input
@@ -175,9 +171,7 @@ export default function LoginPage() {
             value={nickname}
             onInput={handleNicknameInput}
           />
-          <Text className='field-help'>
-            微信登录不再自动返回头像昵称，可手动填写昵称；留空将使用系统默认名称。
-          </Text>
+
         </View>
 
         <View className='privacy-row'>
@@ -192,12 +186,9 @@ export default function LoginPage() {
         </View>
 
         <Button className='wechat-btn' onClick={handleWechatLogin}>
-          微信登录
+          登录
         </Button>
 
-        <Text className='login-tip'>
-          登录后即可创建日历并管理预约记录。
-        </Text>
       </View>
     </View>
   )
